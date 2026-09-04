@@ -1,0 +1,32 @@
+---
+description: Treat docs/ as the PEAM-Registry system source of truth
+alwaysApply: true
+---
+
+# Docs are the system source of truth
+
+Before implementing features, schema, APIs, or UI for PEAM-Registry, read `docs/` and follow it. Do not invent processes, tables, columns, enums, roles, or flows that contradict these files.
+
+- `docs/process_flow.md` — architecture, roles, and end-to-end processes
+- `docs/schema.sql` — canonical Supabase/PostgreSQL schema, RLS, RPCs, and constraints
+- `docs/user_journey.jpeg` — employee mobile journey screens (Sign in → Select → Check in → Authenticate → Confirmation)
+
+If code and docs disagree, **docs win**. Update code to match. Only change `docs/` when the user explicitly asks to change the system design.
+
+## Architecture (do not substitute)
+
+- Mobile: Flutter (employees). Primary attendance client.
+- Admin web: Vue.js + TypeScript + Vite, Shadcn/Vue, Tailwind, Pinia, Vue Router. HR/admins only. Hosted on Vercel.
+- Backend: Supabase (Auth, PostgreSQL, RLS). Shared by both clients.
+
+Do not duplicate attendance check-in/out in the web app. Do not add a separate custom backend unless the user asks.
+
+## Roles and security
+
+Roles: `employee`, `hr_administrator`, `system_administrator`.
+
+Attendance requires GPS geofence then device biometric (never store fingerprint/face). One active device per employee; later devices go through HR-approved `device_change_requests`. Employees see only their own records; staff use `is_staff()`.
+
+## Data
+
+Use the tables, enums, RPCs, and constraints in `schema.sql` as-is (`create_employee`, `approve_device_change_request`, `reject_device_change_request`, `attendance_overview`, one attendance row per employee per event, `client_record_id` for offline sync). Mobile is offline-first: store locally when offline, sync when connected, then mark local rows synced.
