@@ -7,10 +7,16 @@ import 'app_vector.dart';
 import 'soft_card.dart';
 
 class EventCard extends StatelessWidget {
-  const EventCard({super.key, required this.event, required this.onTap});
+  const EventCard({
+    super.key,
+    required this.event,
+    required this.onTap,
+    this.actionLabel = 'Open',
+  });
 
   final ProvincialEvent event;
   final VoidCallback onTap;
+  final String actionLabel;
 
   Color get _accent {
     return switch (event.status) {
@@ -108,7 +114,10 @@ class EventCard extends StatelessWidget {
                   spacing: 14,
                   runSpacing: 8,
                   children: [
-                    _Meta(icon: Icons.schedule_outlined, label: event.scheduleLabel),
+                    _Meta(
+                      icon: Icons.schedule_outlined,
+                      label: event.scheduleLabel,
+                    ),
                     _Meta(
                       icon: Icons.calendar_today_outlined,
                       label: event.dateLabel.split(',').first,
@@ -117,14 +126,19 @@ class EventCard extends StatelessWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: const BoxDecoration(
                   color: AppColors.button,
-                  borderRadius: BorderRadius.all(Radius.circular(AppRadii.pill)),
+                  borderRadius: BorderRadius.all(
+                    Radius.circular(AppRadii.pill),
+                  ),
                 ),
-                child: const Text(
-                  'Open',
-                  style: TextStyle(
+                child: Text(
+                  actionLabel,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
                     fontSize: 12,

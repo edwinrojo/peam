@@ -57,15 +57,18 @@ class HistoryScreen extends StatelessWidget {
             Text(
               records.isEmpty
                   ? 'No attendance records yet.'
-                  : 'There are ${records.length} synced or local records.',
+                  : '${records.length} local records · ${session.pendingCount} pending sync · ${session.remoteRecordCount} in mock Supabase',
               style: const TextStyle(color: AppColors.muted),
             ),
+            const SizedBox(height: 16),
+            _SyncPrototypeCard(session: session),
             const SizedBox(height: 18),
             if (records.isNotEmpty)
               ...records.map(
                 (record) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: SoftCard(
+                    key: Key('history-${record.event.id}'),
                     padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
@@ -100,25 +103,31 @@ class HistoryScreen extends StatelessWidget {
                                   fontSize: 13,
                                 ),
                               ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                children: [
+                                  _Chip(
+                                    label: _status(record),
+                                    color: _statusColor(record),
+                                    fill: _statusFill(record),
+                                  ),
+                                  _Chip(
+                                    key: Key('sync-chip-${record.event.id}'),
+                                    label: record.isPending
+                                        ? 'Pending'
+                                        : 'Synced',
+                                    color: record.isPending
+                                        ? AppColors.peachDeep
+                                        : AppColors.mintDeep,
+                                    fill: record.isPending
+                                        ? AppColors.peach
+                                        : AppColors.mint,
+                                  ),
+                                ],
+                              ),
                             ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _statusFill(record),
-                            borderRadius: BorderRadius.circular(AppRadii.pill),
-                          ),
-                          child: Text(
-                            _status(record),
-                            style: TextStyle(
-                              color: _statusColor(record),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
                           ),
                         ),
                       ],
@@ -148,5 +157,129 @@ class HistoryScreen extends StatelessWidget {
       'Dec',
     ];
     return '${months[time.month - 1]} ${time.day}, ${time.year}';
+  }
+}
+
+class _SyncPrototypeCard extends StatelessWidget {
+  const _SyncPrototypeCard({required this.session});
+
+  final SessionController session;
+
+  @override
+  Widget build(BuildContext context) {
+    final online = session.isOnline;
+    return SoftCard(
+      color: online ? AppColors.mint : AppColors.peach,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            online
+                ? 'Prototype connectivity: online'
+                : 'Prototype connectivity: offline',
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              color: AppColors.ink,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            online
+                ? 'Pending local rows upload to a mock Supabase table, then are marked synced. Device network: ${session.deviceHasNetwork ? 'available' : 'none'}.'
+                : 'Check-ins are stored in the on-device SQLite database (Room / Core Data stand-in). They stay pending until connectivity is restored. Device network: ${session.deviceHasNetwork ? 'available' : 'none'}.',
+            style: const TextStyle(
+              color: AppColors.ink,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (!online)
+                FilledButton(
+                  key: const Key('simulate-online-button'),
+                  onPressed: session.isSyncing
+                      ? null
+                      : () async {
+                          final uploaded = await session.simulateOnlineAndSync();
+                          if (!context.mounted) {
+                            return;
+                          }
+                          _showSyncResult(context, uploaded);
+                        },
+                  child: Text(
+                    session.isSyncing ? 'Syncing…' : 'Simulate connectivity',
+                  ),
+                )
+              else ...[
+                FilledButton(
+                  key: const Key('sync-now-button'),
+                  onPressed: session.pendingCount == 0 || session.isSyncing
+                      ? null
+                      : () async {
+                          final uploaded = await session.syncPending();
+                          if (!context.mounted) {
+                            return;
+                          }
+                          _showSyncResult(context, uploaded);
+                        },
+                  child: Text(session.isSyncing ? 'Syncing…' : 'Sync now'),
+                ),
+                OutlinedButton(
+                  key: const Key('simulate-offline-button'),
+                  onPressed: session.simulateOffline,
+                  child: const Text('Simulate offline'),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+void _showSyncResult(BuildContext context, int uploaded) {
+  final message = uploaded == 0
+      ? 'No pending records to upload.'
+      : uploaded == 1
+      ? '1 attendance record uploaded to mock Supabase.'
+      : '$uploaded attendance records uploaded to mock Supabase.';
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip({
+    super.key,
+    required this.label,
+    required this.color,
+    required this.fill,
+  });
+
+  final String label;
+  final Color color;
+  final Color fill;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
   }
 }

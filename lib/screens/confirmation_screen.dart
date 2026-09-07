@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../state/session_controller.dart';
@@ -22,7 +24,9 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      SessionScope.of(context).confirmAttendance(checkInAt: DateTime.now());
+      unawaited(
+        SessionScope.of(context).confirmAttendance(checkInAt: DateTime.now()),
+      );
     });
   }
 
@@ -104,9 +108,7 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
                               ),
                               _Info(
                                 label: 'Sync status',
-                                value: record.recordedOffline
-                                    ? 'Pending · recorded offline'
-                                    : 'Synced',
+                                value: record.syncLabel,
                                 isLast: true,
                               ),
                             ],
@@ -138,11 +140,7 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
 }
 
 class _Info extends StatelessWidget {
-  const _Info({
-    required this.label,
-    required this.value,
-    this.isLast = false,
-  });
+  const _Info({required this.label, required this.value, this.isLast = false});
 
   final String label;
   final String value;

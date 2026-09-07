@@ -94,8 +94,14 @@ abstract final class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-        hintStyle: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w500),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 18,
+        ),
+        hintStyle: const TextStyle(
+          color: AppColors.muted,
+          fontWeight: FontWeight.w500,
+        ),
         labelStyle: const TextStyle(color: AppColors.muted),
         prefixIconColor: AppColors.muted,
         suffixIconColor: AppColors.muted,

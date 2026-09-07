@@ -22,10 +22,7 @@ class _MainShellState extends State<MainShell> {
     final screens = const [HomeScreen(), HistoryScreen(), ProfileScreen()];
 
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: screens[_index],
-      ),
+      body: SafeArea(bottom: false, child: screens[_index]),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,

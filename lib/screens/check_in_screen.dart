@@ -119,7 +119,10 @@ class CheckInScreen extends StatelessWidget {
                   padding: const EdgeInsets.all(16),
                   child: const Row(
                     children: [
-                      Icon(Icons.check_circle_rounded, color: AppColors.mintDeep),
+                      Icon(
+                        Icons.check_circle_rounded,
+                        color: AppColors.mintDeep,
+                      ),
                       SizedBox(width: 10),
                       Expanded(
                         child: Text(

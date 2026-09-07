@@ -63,7 +63,11 @@ class _BiometricScreenState extends State<BiometricScreen> {
                       style: TextStyle(color: AppColors.muted, height: 1.45),
                     ),
                     const SizedBox(height: 28),
-                    const AppVector(AppVectors.biometric, width: 180, height: 180),
+                    const AppVector(
+                      AppVectors.biometric,
+                      width: 180,
+                      height: 180,
+                    ),
                     const SizedBox(height: 24),
                     Row(
                       children: [

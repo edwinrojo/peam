@@ -39,26 +39,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     setState(() => _error = null);
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    final error = SessionScope.of(context).register(
+    final error = await SessionScope.of(context).register(
       fullName: _nameController.text,
       employeeNumber: _employeeIdController.text,
       password: _passwordController.text,
       department: _department,
       phone: _phoneController.text,
     );
+    if (!mounted) {
+      return;
+    }
     if (error != null) {
       setState(() => _error = error);
       return;
     }
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      MainShell.routeName,
-      (route) => false,
-    );
+    Navigator.of(
+      context,
+    ).pushNamedAndRemoveUntil(MainShell.routeName, (route) => false);
   }
 
   @override
@@ -81,24 +83,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                  const Text(
-                    'Create your PEAM account',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
-                      letterSpacing: -0.4,
+                    const Text(
+                      'Create your PEAM account',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.ink,
+                        letterSpacing: -0.4,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Register your employee profile and bind this phone as your authorized attendance device.',
-                    style: TextStyle(color: AppColors.muted, height: 1.4),
-                  ),
-                  const SizedBox(height: 16),
-                  const AppVector(AppVectors.heroAttendance, height: 96),
-                  const SizedBox(height: 16),
-                  Form(
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Register your employee profile and bind this phone as your authorized attendance device.',
+                      style: TextStyle(color: AppColors.muted, height: 1.4),
+                    ),
+                    const SizedBox(height: 16),
+                    const AppVector(AppVectors.heroAttendance, height: 96),
+                    const SizedBox(height: 16),
+                    Form(
                       key: _formKey,
                       child: Column(
                         children: [

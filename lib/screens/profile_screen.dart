@@ -73,14 +73,13 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   _DetailRow(
                     label: 'Mobile',
-                    value: (employee.phone == null || employee.phone!.trim().isEmpty)
+                    value:
+                        (employee.phone == null ||
+                            employee.phone!.trim().isEmpty)
                         ? 'Not provided'
                         : employee.phone!,
                   ),
-                  _DetailRow(
-                    label: 'Device',
-                    value: employee.deviceName,
-                  ),
+                  _DetailRow(label: 'Device', value: employee.deviceName),
                   _DetailRow(
                     label: 'Binding',
                     value: employee.deviceBound ? 'Active' : 'Unbound',

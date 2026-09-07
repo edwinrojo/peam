@@ -32,16 +32,19 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     setState(() => _error = null);
     if (!_formKey.currentState!.validate()) {
       return;
     }
     final session = SessionScope.of(context);
-    final error = session.login(
+    final error = await session.login(
       employeeNumber: _employeeIdController.text,
       password: _passwordController.text,
     );
+    if (!mounted) {
+      return;
+    }
     if (error != null) {
       setState(() => _error = error);
       return;

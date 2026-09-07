@@ -14,7 +14,10 @@ abstract final class SampleData {
       name: 'Provincial Social Welfare and Development Office',
       code: 'PSWDO',
     ),
-    Department(name: 'Provincial Planning and Development Office', code: 'PPDO'),
+    Department(
+      name: 'Provincial Planning and Development Office',
+      code: 'PPDO',
+    ),
     Department(name: "Provincial Accountant's Office", code: 'PACCO'),
   ];
 
@@ -96,11 +99,20 @@ abstract final class SampleData {
     final briefing = events.firstWhere((event) => event.id == 'evt-briefing');
     return [
       AttendanceRecord(
+        clientRecordId: 'c0a80100-0000-4000-8000-00000000bf01',
+        serverId: 'a11e0000-0000-4000-8000-00000000bf01',
         event: briefing,
         employee: employee,
         checkInAt: DateTime(2026, 8, 18, 8, 51),
         checkOutAt: DateTime(2026, 8, 18, 12, 04),
+        checkInLatitude: capitol.latitude,
+        checkInLongitude: capitol.longitude,
         attendanceStatus: AttendanceStatus.present,
+        verificationStatus: VerificationStatus.verified,
+        recordedOffline: false,
+        syncStatus: SyncStatus.synced,
+        clientRecordedAt: DateTime(2026, 8, 18, 8, 51),
+        syncedAt: DateTime(2026, 8, 18, 8, 52),
       ),
     ];
   }

@@ -27,10 +27,7 @@ class AppVector extends StatelessWidget {
       colorFilter: color == null
           ? null
           : ColorFilter.mode(color!, BlendMode.srcIn),
-      placeholderBuilder: (context) => SizedBox(
-        width: width,
-        height: height,
-      ),
+      placeholderBuilder: (context) => SizedBox(width: width, height: height),
     );
   }
 }

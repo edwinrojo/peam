@@ -18,10 +18,7 @@ class GeofenceMap extends StatelessWidget {
         width: double.infinity,
         child: Stack(
           children: [
-            CustomPaint(
-              painter: _MapPainter(),
-              child: const SizedBox.expand(),
-            ),
+            CustomPaint(painter: _MapPainter(), child: const SizedBox.expand()),
             Align(
               alignment: const Alignment(0.08, -0.08),
               child: _Pin(
@@ -131,7 +128,12 @@ class _MapPainter extends CustomPainter {
     final water = Paint()..color = AppColors.mapWater;
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(size.width * 0.62, size.height * 0.08, size.width * 0.5, size.height * 0.9),
+        Rect.fromLTWH(
+          size.width * 0.62,
+          size.height * 0.08,
+          size.width * 0.5,
+          size.height * 0.9,
+        ),
         const Radius.circular(80),
       ),
       water,
