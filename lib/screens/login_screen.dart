@@ -101,7 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   textInputAction: TextInputAction.next,
                                   decoration: const InputDecoration(
                                     labelText: 'Employee ID',
-                                    hintText: 'DS-0142',
+                                    hintText: '1234',
                                     prefixIcon: Icon(Icons.badge_outlined),
                                   ),
                                   validator: (value) {

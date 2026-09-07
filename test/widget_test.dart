@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:peam/app.dart';
 import 'package:peam/data/sample_data.dart';
+import 'package:peam/services/biometric_auth_service.dart';
 
 void main() {
   testWidgets('login screen shows the sign-in journey controls', (
@@ -109,8 +110,6 @@ void main() {
     expect(find.text('Face'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('biometric-button')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 900));
     await tester.pumpAndSettle();
 
     expect(find.text('Attendance confirmed'), findsOneWidget);
@@ -122,6 +121,29 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Official events'), findsOneWidget);
+  });
+
+  testWidgets('failed biometric stays on the authenticate screen', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const PeamApp(biometricAuth: _RejectingBiometricAuth()),
+    );
+    await _loginAsDemo(tester);
+
+    await tester.ensureVisible(
+      find.byKey(const Key('event-card-evt-assembly')),
+    );
+    await tester.tap(find.byKey(const Key('event-card-evt-assembly')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('check-in-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('biometric-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Verify it is you'), findsOneWidget);
+    expect(find.text('Not recognized. Try again.'), findsOneWidget);
+    expect(find.text('Attendance confirmed'), findsNothing);
   });
 
   testWidgets('offline check-in is stored locally and syncs when online', (
@@ -143,8 +165,6 @@ void main() {
     await tester.tap(find.byKey(const Key('check-in-button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('biometric-button')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 900));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Pending'), findsOneWidget);
@@ -220,4 +240,20 @@ Future<void> _loginAsDemo(WidgetTester tester) async {
   await tester.ensureVisible(find.byKey(const Key('login-button')));
   await tester.tap(find.byKey(const Key('login-button')));
   await tester.pumpAndSettle();
+}
+
+class _RejectingBiometricAuth implements BiometricAuthService {
+  const _RejectingBiometricAuth();
+
+  @override
+  Future<BiometricAvailability> probe() async {
+    return BiometricAvailability.stubEnrolled;
+  }
+
+  @override
+  Future<BiometricAuthResult> authenticate({
+    required BiometricMethod method,
+  }) async {
+    return const BiometricAuthResult.failure('Not recognized. Try again.');
+  }
 }

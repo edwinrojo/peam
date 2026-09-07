@@ -28,9 +28,9 @@ abstract final class SampleData {
   );
 
   static final demoEmployee = Employee(
-    employeeNumber: 'DS-0142',
-    fullName: 'Maria Elena Santos',
-    password: 'peam2026',
+    employeeNumber: '1234',
+    fullName: 'Edwin Rojo',
+    password: 'password',
     department: departments.first,
     phone: '0917 552 1840',
     deviceName: 'Samsung Galaxy A55',

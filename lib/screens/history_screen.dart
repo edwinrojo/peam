@@ -205,7 +205,8 @@ class _SyncPrototypeCard extends StatelessWidget {
                   onPressed: session.isSyncing
                       ? null
                       : () async {
-                          final uploaded = await session.simulateOnlineAndSync();
+                          final uploaded = await session
+                              .simulateOnlineAndSync();
                           if (!context.mounted) {
                             return;
                           }

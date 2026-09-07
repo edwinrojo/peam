@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app.dart';
 import 'services/attendance_stores.dart';
+import 'services/biometric_auth_service.dart';
 import 'services/connectivity_controller.dart';
 import 'services/push_notification_service.dart';
 import 'services/sqlite_attendance_database.dart';
@@ -31,6 +32,7 @@ Future<void> main() async {
   runApp(
     PeamApp(
       pushNotifications: pushNotifications,
+      biometricAuth: DeviceBiometricAuthService(),
       session: SessionController(
         pushNotifications: pushNotifications,
         localStore: localStore,
