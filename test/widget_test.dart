@@ -52,7 +52,7 @@ void main() {
 
     expect(find.text('Official events'), findsOneWidget);
     expect(find.text('Provincial Employees Assembly 2026'), findsOneWidget);
-    expect(find.text('Good day, Maria'), findsOneWidget);
+    expect(find.text('Good day, ${SampleData.demoEmployee.firstName}'), findsOneWidget);
   });
 
   testWidgets('register screen can create an account and reach home', (
@@ -113,7 +113,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Attendance confirmed'), findsOneWidget);
-    expect(find.text('Maria Elena Santos'), findsOneWidget);
+    expect(find.text(SampleData.demoEmployee.fullName), findsOneWidget);
     expect(find.text('Geofence and biometric verified'), findsOneWidget);
     expect(find.textContaining('Pending'), findsOneWidget);
 
