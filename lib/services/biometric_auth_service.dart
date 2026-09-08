@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:local_auth_android/local_auth_android.dart';
+import 'package:local_auth_darwin/local_auth_darwin.dart';
 
 enum BiometricMethod { face, fingerprint }
 
@@ -25,15 +27,12 @@ class BiometricAvailability {
   final bool face;
   final bool fingerprint;
 
-  /// Android often reports only strong/weak instead of face vs fingerprint.
+  /// True when the OS reported strong/weak classes instead of face vs fingerprint.
   final bool deviceBiometric;
 
-  bool get hasAny => face || fingerprint || deviceBiometric;
+  bool get hasAny => face || fingerprint;
 
   bool supports(BiometricMethod method) {
-    if (deviceBiometric) {
-      return true;
-    }
     return switch (method) {
       BiometricMethod.face => face,
       BiometricMethod.fingerprint => fingerprint,
@@ -106,14 +105,13 @@ class DeviceBiometricAuthService implements BiometricAuthService {
   }) async {
     try {
       final didAuthenticate = await _auth.authenticate(
-        localizedReason: switch (method) {
-          BiometricMethod.face =>
-            'PEAM uses Face ID to confirm it is you before recording attendance. Your face data stays on this phone.',
-          BiometricMethod.fingerprint =>
-            'PEAM uses your fingerprint to confirm it is you before recording attendance. Your fingerprint stays on this phone.',
-        },
+        localizedReason: localizedReasonForMethod(method),
+        authMessages: authMessagesForMethod(method),
         biometricOnly: true,
         persistAcrossBackgrounding: true,
+        // Face match can finish without an extra "confirm" tap; fingerprint
+        // still uses the default confirmation behavior.
+        sensitiveTransaction: method == BiometricMethod.fingerprint,
       );
       if (didAuthenticate) {
         return const BiometricAuthResult.success();
@@ -127,16 +125,55 @@ class DeviceBiometricAuthService implements BiometricAuthService {
   }
 }
 
+/// Android reports Class 3 as [BiometricType.strong] and Class 2 as
+/// [BiometricType.weak]. Class 3 (fingerprint) also satisfies Class 2, so a
+/// fingerprint-only phone often returns both weak and strong. Face is only
+/// offered when the OS names face, or when a weak biometric is enrolled
+/// without a strong one (typical 2D face unlock).
 BiometricAvailability availabilityFromBiometricTypes(
   List<BiometricType> types,
 ) {
+  final namedFace =
+      types.contains(BiometricType.face) || types.contains(BiometricType.iris);
+  final namedFingerprint = types.contains(BiometricType.fingerprint);
+  final strong = types.contains(BiometricType.strong);
+  final weak = types.contains(BiometricType.weak);
+
   return BiometricAvailability(
-    face: types.contains(BiometricType.face),
-    fingerprint: types.contains(BiometricType.fingerprint),
-    deviceBiometric:
-        types.contains(BiometricType.strong) ||
-        types.contains(BiometricType.weak),
+    face: namedFace || (weak && !strong),
+    fingerprint: namedFingerprint || strong,
+    deviceBiometric: strong || weak,
   );
+}
+
+String localizedReasonForMethod(BiometricMethod method) {
+  return switch (method) {
+    BiometricMethod.face =>
+      'PEAM uses face unlock to confirm it is you before recording attendance. Your face data stays on this phone.',
+    BiometricMethod.fingerprint =>
+      'PEAM uses your fingerprint to confirm it is you before recording attendance. Your fingerprint stays on this phone.',
+  };
+}
+
+List<AuthMessages> authMessagesForMethod(BiometricMethod method) {
+  return switch (method) {
+    BiometricMethod.face => const [
+      AndroidAuthMessages(
+        signInTitle: 'Verify with face',
+        signInHint: 'Look at the front camera',
+        cancelButton: 'Cancel',
+      ),
+      IOSAuthMessages(cancelButton: 'Cancel', localizedFallbackTitle: ''),
+    ],
+    BiometricMethod.fingerprint => const [
+      AndroidAuthMessages(
+        signInTitle: 'Verify with fingerprint',
+        signInHint: 'Touch the fingerprint sensor',
+        cancelButton: 'Cancel',
+      ),
+      IOSAuthMessages(cancelButton: 'Cancel', localizedFallbackTitle: ''),
+    ],
+  };
 }
 
 String messageForLocalAuthException(LocalAuthException error) {
