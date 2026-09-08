@@ -11,6 +11,9 @@ concurrency:
   group: flutter-apk-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   build-apk:
     name: Flutter build apk
@@ -44,9 +47,28 @@ jobs:
       - name: Build APK
         run: flutter build apk --release
 
+      - name: Prepare downloadable APK
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk dist/peam-release.apk
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v6
         with:
           name: peam-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: dist/peam-release.apk
           if-no-files-found: error
+
+      - name: Publish latest APK release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-apk
+          name: Latest Android APK
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: dist/peam-release.apk
+          body: |
+            Release APK from commit `${{ github.sha }}`.
+
+            Direct download: https://github.com/${{ github.repository }}/releases/latest/download/peam-release.apk

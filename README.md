@@ -1,6 +1,16 @@
 # peam
 
-A new Flutter project.
+PEAM-Registry mobile app for provincial event attendance.
+
+## Download the APK
+
+After a successful GitHub Actions build on `main`, the release APK is published on the repository **Releases** page:
+
+**[Download peam-release.apk](https://github.com/edwinrojo/peam/releases/latest/download/peam-release.apk)**
+
+That link always points at the newest build. You can also open [Releases](https://github.com/edwinrojo/peam/releases/latest).
+
+Branch and pull-request builds still attach an APK under the workflow run (**Actions → Build Android APK → Artifacts**). Those expire; the Release file does not.
 
 ## Getting Started
 
