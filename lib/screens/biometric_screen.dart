@@ -161,23 +161,12 @@ class _BiometricScreenState extends State<BiometricScreen> {
                     ),
                     if (_availability.face && _availability.fingerprint) ...[
                       const SizedBox(height: 14),
-                      const Text(
-                        'If this phone has both enrolled, look at the camera when Face is selected. Some phones still open the fingerprint sensor first.',
+                      Text(
+                        _method == BiometricMethod.face
+                            ? 'Look at the front camera. Samsung may still offer fingerprint as a backup in the system prompt.'
+                            : 'Use the fingerprint sensor. The prompt is limited to fingerprint when Face is not selected.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 13,
-                          height: 1.4,
-                        ),
-                      ),
-                    ] else if (_availability.deviceBiometric &&
-                        _availability.fingerprint &&
-                        !_availability.face) ...[
-                      const SizedBox(height: 14),
-                      const Text(
-                        'This phone reported fingerprint unlock. Face is offered only when face unlock is enrolled without a fingerprint.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: AppColors.muted,
                           fontSize: 13,
                           height: 1.4,

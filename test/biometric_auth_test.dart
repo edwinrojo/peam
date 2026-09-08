@@ -55,6 +55,55 @@ void main() {
     },
   );
 
+  test('offers face on Android when face hardware is present', () {
+    final availability = availabilityFromBiometricTypes(
+      const [BiometricType.weak, BiometricType.strong],
+      android: const AndroidBiometricCapabilities(
+        faceHardware: true,
+        fingerprintHardware: true,
+        faceEnrolled: true,
+        fingerprintEnrolled: true,
+      ),
+    );
+
+    expect(availability.face, isTrue);
+    expect(availability.fingerprint, isTrue);
+    expect(availability.supports(BiometricMethod.face), isTrue);
+    expect(availability.supports(BiometricMethod.fingerprint), isTrue);
+  });
+
+  test(
+    'offers face when Galaxy face hardware exists but enrollment probe is unknown',
+    () {
+      final availability = availabilityFromBiometricTypes(
+        const [BiometricType.weak, BiometricType.strong],
+        android: const AndroidBiometricCapabilities(
+          faceHardware: true,
+          fingerprintHardware: true,
+          fingerprintEnrolled: true,
+        ),
+      );
+
+      expect(availability.face, isTrue);
+      expect(availability.fingerprint, isTrue);
+    },
+  );
+
+  test('hides face when Samsung reports it is not enrolled', () {
+    final availability = availabilityFromBiometricTypes(
+      const [BiometricType.weak, BiometricType.strong],
+      android: const AndroidBiometricCapabilities(
+        faceHardware: true,
+        fingerprintHardware: true,
+        faceEnrolled: false,
+        fingerprintEnrolled: true,
+      ),
+    );
+
+    expect(availability.face, isFalse);
+    expect(availability.fingerprint, isTrue);
+  });
+
   test('uses face-specific Android prompt copy', () {
     final messages = authMessagesForMethod(BiometricMethod.face);
     final android = messages.whereType<AndroidAuthMessages>().single;
@@ -73,6 +122,13 @@ void main() {
 
     expect(android.signInTitle, 'Verify with fingerprint');
     expect(android.signInHint, 'Touch the fingerprint sensor');
+  });
+
+  test('maps Android biometric cancel to a safe attendance message', () {
+    expect(
+      messageForAndroidBiometricCode('userCanceled', 'Canceled'),
+      contains('canceled'),
+    );
   });
 
   test('explains missing enrollment without exposing biometric data', () {

@@ -1,9 +1,26 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:local_auth_android/local_auth_android.dart';
 import 'package:local_auth_darwin/local_auth_darwin.dart';
 
 enum BiometricMethod { face, fingerprint }
+
+class AndroidBiometricCapabilities {
+  const AndroidBiometricCapabilities({
+    required this.faceHardware,
+    required this.fingerprintHardware,
+    this.faceEnrolled,
+    this.fingerprintEnrolled,
+  });
+
+  final bool faceHardware;
+  final bool fingerprintHardware;
+
+  /// Samsung can report face enrollment separately. Null means unknown.
+  final bool? faceEnrolled;
+  final bool? fingerprintEnrolled;
+}
 
 class BiometricAvailability {
   const BiometricAvailability({
@@ -74,12 +91,102 @@ class StubBiometricAuthService implements BiometricAuthService {
   }
 }
 
+abstract class AndroidBiometricsClient {
+  Future<AndroidBiometricCapabilities?> probe();
+
+  Future<BiometricAuthResult?> authenticate({required BiometricMethod method});
+}
+
+class MethodChannelAndroidBiometrics implements AndroidBiometricsClient {
+  const MethodChannelAndroidBiometrics();
+
+  static const _channel = MethodChannel('peam.biometrics');
+
+  @override
+  Future<AndroidBiometricCapabilities?> probe() async {
+    if (!_isAndroid) {
+      return null;
+    }
+    try {
+      final data = await _channel.invokeMapMethod<String, Object?>('probe');
+      if (data == null) {
+        return null;
+      }
+      return AndroidBiometricCapabilities(
+        faceHardware: data['faceHardware'] == true,
+        fingerprintHardware: data['fingerprintHardware'] == true,
+        faceEnrolled: _optionalBool(data['faceEnrolled']),
+        fingerprintEnrolled: _optionalBool(data['fingerprintEnrolled']),
+      );
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+  }
+
+  @override
+  Future<BiometricAuthResult?> authenticate({
+    required BiometricMethod method,
+  }) async {
+    if (!_isAndroid) {
+      return null;
+    }
+    try {
+      final data = await _channel
+          .invokeMapMethod<String, Object?>('authenticate', {
+            'method': method.name,
+            'title': androidTitleForMethod(method),
+            'subtitle': androidHintForMethod(method),
+            'reason': localizedReasonForMethod(method),
+            'cancel': 'Cancel',
+          });
+      if (data == null) {
+        return const BiometricAuthResult.failure(
+          'Biometric verification was not completed. Try again.',
+        );
+      }
+      if (data['authenticated'] == true) {
+        return const BiometricAuthResult.success();
+      }
+      return BiometricAuthResult.failure(
+        messageForAndroidBiometricCode(
+          data['code'] as String?,
+          data['message'] as String?,
+        ),
+      );
+    } on MissingPluginException {
+      return null;
+    } on PlatformException catch (error) {
+      return BiometricAuthResult.failure(
+        error.message?.trim().isNotEmpty == true
+            ? error.message!
+            : 'Biometric verification failed. Try again.',
+      );
+    }
+  }
+
+  static bool get _isAndroid =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  static bool? _optionalBool(Object? value) {
+    if (value is bool) {
+      return value;
+    }
+    return null;
+  }
+}
+
 /// Device Face ID / fingerprint via the OS. Nothing is stored by PEAM.
 class DeviceBiometricAuthService implements BiometricAuthService {
-  DeviceBiometricAuthService({LocalAuthentication? auth})
-    : _auth = auth ?? LocalAuthentication();
+  DeviceBiometricAuthService({
+    LocalAuthentication? auth,
+    AndroidBiometricsClient? androidBiometrics,
+  }) : _auth = auth ?? LocalAuthentication(),
+       _android = androidBiometrics ?? const MethodChannelAndroidBiometrics();
 
   final LocalAuthentication _auth;
+  final AndroidBiometricsClient _android;
 
   @override
   Future<BiometricAvailability> probe() async {
@@ -93,7 +200,8 @@ class DeviceBiometricAuthService implements BiometricAuthService {
         return BiometricAvailability.none;
       }
       final types = await _auth.getAvailableBiometrics();
-      return availabilityFromBiometricTypes(types);
+      final android = await _android.probe();
+      return availabilityFromBiometricTypes(types, android: android);
     } on LocalAuthException {
       return BiometricAvailability.none;
     }
@@ -104,13 +212,15 @@ class DeviceBiometricAuthService implements BiometricAuthService {
     required BiometricMethod method,
   }) async {
     try {
+      final androidResult = await _android.authenticate(method: method);
+      if (androidResult != null) {
+        return androidResult;
+      }
       final didAuthenticate = await _auth.authenticate(
         localizedReason: localizedReasonForMethod(method),
         authMessages: authMessagesForMethod(method),
         biometricOnly: true,
         persistAcrossBackgrounding: true,
-        // Face match can finish without an extra "confirm" tap; fingerprint
-        // still uses the default confirmation behavior.
         sensitiveTransaction: method == BiometricMethod.fingerprint,
       );
       if (didAuthenticate) {
@@ -127,23 +237,58 @@ class DeviceBiometricAuthService implements BiometricAuthService {
 
 /// Android reports Class 3 as [BiometricType.strong] and Class 2 as
 /// [BiometricType.weak]. Class 3 (fingerprint) also satisfies Class 2, so a
-/// fingerprint-only phone often returns both weak and strong. Face is only
-/// offered when the OS names face, or when a weak biometric is enrolled
-/// without a strong one (typical 2D face unlock).
+/// fingerprint-only phone often returns both weak and strong.
+///
+/// When [android] hardware/enrollment is provided (Galaxy S22 and similar),
+/// Face is offered if face hardware exists and is enrolled — or if enrollment
+/// cannot be read but face hardware is present and some biometric is enrolled.
 BiometricAvailability availabilityFromBiometricTypes(
-  List<BiometricType> types,
-) {
+  List<BiometricType> types, {
+  AndroidBiometricCapabilities? android,
+}) {
   final namedFace =
       types.contains(BiometricType.face) || types.contains(BiometricType.iris);
   final namedFingerprint = types.contains(BiometricType.fingerprint);
   final strong = types.contains(BiometricType.strong);
   final weak = types.contains(BiometricType.weak);
+  final deviceBiometric = strong || weak;
+
+  if (android == null) {
+    return BiometricAvailability(
+      face: namedFace || (weak && !strong),
+      fingerprint: namedFingerprint || strong,
+      deviceBiometric: deviceBiometric,
+    );
+  }
 
   return BiometricAvailability(
-    face: namedFace || (weak && !strong),
-    fingerprint: namedFingerprint || strong,
-    deviceBiometric: strong || weak,
+    face:
+        namedFace ||
+        _androidMethodAvailable(
+          hardware: android.faceHardware,
+          enrolled: android.faceEnrolled,
+          deviceBiometric: deviceBiometric,
+        ),
+    fingerprint:
+        namedFingerprint ||
+        _androidMethodAvailable(
+          hardware: android.fingerprintHardware,
+          enrolled: android.fingerprintEnrolled,
+          deviceBiometric: deviceBiometric,
+        ),
+    deviceBiometric: deviceBiometric,
   );
+}
+
+bool _androidMethodAvailable({
+  required bool hardware,
+  required bool? enrolled,
+  required bool deviceBiometric,
+}) {
+  if (!hardware || !deviceBiometric) {
+    return false;
+  }
+  return enrolled ?? true;
 }
 
 String localizedReasonForMethod(BiometricMethod method) {
@@ -155,24 +300,61 @@ String localizedReasonForMethod(BiometricMethod method) {
   };
 }
 
+String androidTitleForMethod(BiometricMethod method) {
+  return switch (method) {
+    BiometricMethod.face => 'Verify with face',
+    BiometricMethod.fingerprint => 'Verify with fingerprint',
+  };
+}
+
+String androidHintForMethod(BiometricMethod method) {
+  return switch (method) {
+    BiometricMethod.face => 'Look at the front camera',
+    BiometricMethod.fingerprint => 'Touch the fingerprint sensor',
+  };
+}
+
 List<AuthMessages> authMessagesForMethod(BiometricMethod method) {
   return switch (method) {
-    BiometricMethod.face => const [
+    BiometricMethod.face => [
       AndroidAuthMessages(
-        signInTitle: 'Verify with face',
-        signInHint: 'Look at the front camera',
+        signInTitle: androidTitleForMethod(method),
+        signInHint: androidHintForMethod(method),
         cancelButton: 'Cancel',
       ),
-      IOSAuthMessages(cancelButton: 'Cancel', localizedFallbackTitle: ''),
+      const IOSAuthMessages(cancelButton: 'Cancel', localizedFallbackTitle: ''),
     ],
-    BiometricMethod.fingerprint => const [
+    BiometricMethod.fingerprint => [
       AndroidAuthMessages(
-        signInTitle: 'Verify with fingerprint',
-        signInHint: 'Touch the fingerprint sensor',
+        signInTitle: androidTitleForMethod(method),
+        signInHint: androidHintForMethod(method),
         cancelButton: 'Cancel',
       ),
-      IOSAuthMessages(cancelButton: 'Cancel', localizedFallbackTitle: ''),
+      const IOSAuthMessages(cancelButton: 'Cancel', localizedFallbackTitle: ''),
     ],
+  };
+}
+
+String messageForAndroidBiometricCode(String? code, String? platformMessage) {
+  return switch (code) {
+    'userCanceled' || 'systemCanceled' =>
+      'Verification was canceled. Authenticate to finish check-in.',
+    'timeout' => 'The biometric prompt timed out. Try again.',
+    'noBiometricsEnrolled' =>
+      'No fingerprint or face is enrolled on this phone. Add one in system Settings, then try again.',
+    'noBiometricHardware' =>
+      'This phone does not have fingerprint or face hardware.',
+    'noCredentialsSet' =>
+      'Set up a screen lock and enroll a fingerprint or face in Settings first.',
+    'temporaryLockout' => 'Too many attempts. Wait a moment, then try again.',
+    'biometricLockout' =>
+      'Biometrics are locked. Unlock the phone with your PIN or password, then return to PEAM.',
+    'hardwareUnavailable' =>
+      'Biometric hardware is busy. Close other apps and try again.',
+    _ =>
+      platformMessage?.trim().isNotEmpty == true
+          ? platformMessage!
+          : 'Biometric verification failed. Try again.',
   };
 }
 
