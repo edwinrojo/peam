@@ -2,94 +2,87 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:peam/app.dart';
 import 'package:peam/data/sample_data.dart';
+import 'package:peam/services/auth_session_store.dart';
 import 'package:peam/services/biometric_auth_service.dart';
+import 'package:peam/state/session_controller.dart';
 
 void main() {
   testWidgets('login screen shows the sign-in journey controls', (
     tester,
   ) async {
-    await tester.pumpWidget(const PeamApp());
+    await _openApp(tester);
 
     expect(find.text('Sign in'), findsOneWidget);
     expect(find.text('Employee ID'), findsOneWidget);
-    expect(find.text('Password'), findsOneWidget);
     expect(find.byKey(const Key('login-button')), findsOneWidget);
-    expect(find.byKey(const Key('register-link')), findsOneWidget);
+    expect(find.byKey(const Key('register-link')), findsNothing);
+    expect(find.text('Password'), findsNothing);
   });
 
-  testWidgets('login validates empty fields', (tester) async {
-    await tester.pumpWidget(const PeamApp());
+  testWidgets('login validates empty employee id', (tester) async {
+    await _openApp(tester);
 
     await tester.ensureVisible(find.byKey(const Key('login-button')));
     await tester.tap(find.byKey(const Key('login-button')));
     await tester.pump();
 
     expect(find.text('Enter your Employee ID'), findsOneWidget);
-    expect(find.text('Enter your password'), findsOneWidget);
   });
 
-  testWidgets('login rejects unknown credentials', (tester) async {
-    await tester.pumpWidget(const PeamApp());
+  testWidgets('login rejects an unknown employee id', (tester) async {
+    await _openApp(tester);
 
     await tester.enterText(
       find.byKey(const Key('login-employee-id')),
       'DS-0000',
     );
-    await tester.enterText(
-      find.byKey(const Key('login-password')),
-      'wrongpass',
-    );
     await tester.ensureVisible(find.byKey(const Key('login-button')));
     await tester.tap(find.byKey(const Key('login-button')));
     await tester.pump();
 
-    expect(find.text('Employee ID or password is incorrect.'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'This Employee ID is not on file. Ask HRMDO to create your account.',
+      ),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('demo login opens the events home screen', (tester) async {
-    await tester.pumpWidget(const PeamApp());
+  testWidgets('demo email-code login opens the events home screen', (
+    tester,
+  ) async {
+    await _openApp(tester);
     await _loginAsDemo(tester);
 
     expect(find.text('Official events'), findsOneWidget);
     expect(find.text('Provincial Employees Assembly 2026'), findsOneWidget);
-    expect(find.text('Good day, ${SampleData.demoEmployee.firstName}'), findsOneWidget);
+    expect(
+      find.text('Good day, ${SampleData.demoEmployee.firstName}'),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('register screen can create an account and reach home', (
+  testWidgets('a bound session skips the login screen on launch', (
     tester,
   ) async {
-    await tester.pumpWidget(const PeamApp());
+    final store = MemoryAuthSessionStore(deviceUid: 'phone-a');
+    final session = SessionController(authStore: store);
+    addTearDown(session.dispose);
+    final error = await session.completePrototypeLogin(
+      SampleData.demoEmployee.employeeNumber,
+    );
+    expect(error, isNull);
 
-    await tester.tap(find.byKey(const Key('register-link')));
+    await tester.pumpWidget(PeamApp(session: session));
     await tester.pumpAndSettle();
 
-    expect(find.text('Create your PEAM account'), findsOneWidget);
-
-    await tester.enterText(
-      find.byKey(const Key('register-name')),
-      'Juan Dela Cruz',
-    );
-    await tester.enterText(
-      find.byKey(const Key('register-employee-id')),
-      'DS-2088',
-    );
-    await tester.enterText(
-      find.byKey(const Key('register-password')),
-      'capitol1',
-    );
-    await tester.enterText(
-      find.byKey(const Key('register-confirm-password')),
-      'capitol1',
-    );
-    await tester.tap(find.byKey(const Key('register-button')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Good day, Juan'), findsOneWidget);
     expect(find.text('Official events'), findsOneWidget);
+    expect(find.text('Sign in'), findsNothing);
   });
 
   testWidgets('main attendance journey reaches confirmation', (tester) async {
-    await tester.pumpWidget(const PeamApp());
+    await _openApp(tester);
     await _loginAsDemo(tester);
 
     await tester.ensureVisible(
@@ -129,6 +122,7 @@ void main() {
     await tester.pumpWidget(
       const PeamApp(biometricAuth: _RejectingBiometricAuth()),
     );
+    await tester.pumpAndSettle();
     await _loginAsDemo(tester);
 
     await tester.ensureVisible(
@@ -149,7 +143,7 @@ void main() {
   testWidgets('offline check-in is stored locally and syncs when online', (
     tester,
   ) async {
-    await tester.pumpWidget(const PeamApp());
+    await _openApp(tester);
     await _loginAsDemo(tester);
 
     expect(
@@ -190,7 +184,7 @@ void main() {
   });
 
   testWidgets('home search and history navigation work', (tester) async {
-    await tester.pumpWidget(const PeamApp());
+    await _openApp(tester);
     await _loginAsDemo(tester);
 
     await tester.enterText(find.byKey(const Key('home-search')), 'Malalag');
@@ -208,7 +202,7 @@ void main() {
   testWidgets('notifications prototype opens and can simulate a push', (
     tester,
   ) async {
-    await tester.pumpWidget(const PeamApp());
+    await _openApp(tester);
     await _loginAsDemo(tester);
 
     await tester.tap(find.byKey(const Key('notifications-button')));
@@ -228,14 +222,23 @@ void main() {
   });
 }
 
+Future<void> _openApp(WidgetTester tester) async {
+  await tester.pumpWidget(const PeamApp());
+  await tester.pumpAndSettle();
+}
+
 Future<void> _loginAsDemo(WidgetTester tester) async {
   await tester.enterText(
     find.byKey(const Key('login-employee-id')),
     SampleData.demoEmployee.employeeNumber,
   );
+  await tester.ensureVisible(find.byKey(const Key('login-button')));
+  await tester.tap(find.byKey(const Key('login-button')));
+  await tester.pumpAndSettle();
+
   await tester.enterText(
-    find.byKey(const Key('login-password')),
-    SampleData.demoEmployee.password,
+    find.byKey(const Key('login-code')),
+    SampleData.prototypeEmailCode,
   );
   await tester.ensureVisible(find.byKey(const Key('login-button')));
   await tester.tap(find.byKey(const Key('login-button')));

@@ -6,12 +6,12 @@ import 'screens/confirmation_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/notifications_screen.dart';
-import 'screens/register_screen.dart';
 import 'services/biometric_auth_service.dart';
 import 'services/push_notification_service.dart';
 import 'state/biometric_scope.dart';
 import 'state/session_controller.dart';
 import 'theme/app_theme.dart';
+import 'widgets/peam_logo.dart';
 
 class PeamApp extends StatefulWidget {
   const PeamApp({
@@ -41,6 +41,21 @@ class _PeamAppState extends State<PeamApp> {
   late final BiometricAuthService _biometricAuth =
       widget.biometricAuth ?? const StubBiometricAuthService();
 
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _restore();
+  }
+
+  Future<void> _restore() async {
+    await _session.restoreSession();
+    if (mounted) {
+      setState(() => _ready = true);
+    }
+  }
+
   @override
   void dispose() {
     if (widget.session == null) {
@@ -59,16 +74,38 @@ class _PeamAppState extends State<PeamApp> {
           title: 'PEAM-Registry',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light(),
-          initialRoute: '/',
+          home: !_ready
+              ? const _SessionRestoreScreen()
+              : _session.employee != null
+              ? const MainShell()
+              : const LoginScreen(),
           routes: {
-            '/': (_) => const LoginScreen(),
-            RegisterScreen.routeName: (_) => const RegisterScreen(),
             MainShell.routeName: (_) => const MainShell(),
             CheckInScreen.routeName: (_) => const CheckInScreen(),
             BiometricScreen.routeName: (_) => const BiometricScreen(),
             ConfirmationScreen.routeName: (_) => const ConfirmationScreen(),
             NotificationsScreen.routeName: (_) => const NotificationsScreen(),
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _SessionRestoreScreen extends StatelessWidget {
+  const _SessionRestoreScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PeamLogo(showWordmark: true, size: 56),
+            SizedBox(height: 16),
+            Text('Opening PEAM…'),
+          ],
         ),
       ),
     );

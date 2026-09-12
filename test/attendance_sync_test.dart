@@ -78,9 +78,8 @@ void main() {
       );
       addTearDown(session.dispose);
 
-      final error = await session.login(
-        employeeNumber: SampleData.demoEmployee.employeeNumber,
-        password: SampleData.demoEmployee.password,
+      final error = await session.completePrototypeLogin(
+        SampleData.demoEmployee.employeeNumber,
       );
       expect(error, isNull);
 

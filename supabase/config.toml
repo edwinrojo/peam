@@ -1,0 +1,13 @@
+# Deploy with the Supabase CLI against your PEAM project:
+#   supabase link --project-ref <ref>
+#   supabase db query --file docs/schema.sql
+#   supabase functions deploy
+
+[functions.request-login-otp]
+verify_jwt = false
+
+[functions.verify-login-otp]
+verify_jwt = false
+
+[functions.submit-device-change]
+verify_jwt = false

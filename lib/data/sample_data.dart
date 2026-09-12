@@ -27,14 +27,16 @@ abstract final class SampleData {
     geofenceRadiusMeters: 120,
   );
 
-  static final demoEmployee = Employee(
+  static Employee get demoEmployee => Employee(
     employeeNumber: '1234',
     fullName: 'Edwin Rojo',
-    password: 'password',
+    email: 'edwin.rojo@davaodelsur.gov.ph',
     department: departments.first,
     phone: '0917 552 1840',
-    deviceName: 'Samsung Galaxy A55',
   );
+
+  /// Stand-in for the email OTP HR would send from Supabase Auth.
+  static const prototypeEmailCode = '123456';
 
   static final events = <ProvincialEvent>[
     ProvincialEvent(

@@ -17,22 +17,49 @@ class Employee {
   const Employee({
     required this.employeeNumber,
     required this.fullName,
-    required this.password,
     required this.department,
+    this.email,
     this.phone,
-    this.deviceName = 'Samsung Galaxy A55',
-    this.deviceBound = true,
+    this.deviceUid,
+    this.deviceName = 'Unbound',
   });
 
   final String employeeNumber;
   final String fullName;
-  final String password;
+  final String? email;
   final Department department;
   final String? phone;
+  final String? deviceUid;
   final String deviceName;
-  final bool deviceBound;
+
+  bool get deviceBound => deviceUid != null && deviceUid!.isNotEmpty;
 
   String get firstName => fullName.split(' ').first;
+
+  String get workEmail => email?.trim() ?? '';
+
+  bool get hasWorkEmail => workEmail.contains('@');
+
+  Employee copyWith({
+    String? employeeNumber,
+    String? fullName,
+    String? email,
+    Department? department,
+    String? phone,
+    String? deviceUid,
+    String? deviceName,
+    bool clearDevice = false,
+  }) {
+    return Employee(
+      employeeNumber: employeeNumber ?? this.employeeNumber,
+      fullName: fullName ?? this.fullName,
+      email: email ?? this.email,
+      department: department ?? this.department,
+      phone: phone ?? this.phone,
+      deviceUid: clearDevice ? null : (deviceUid ?? this.deviceUid),
+      deviceName: clearDevice ? 'Unbound' : (deviceName ?? this.deviceName),
+    );
+  }
 }
 
 class EventLocation {

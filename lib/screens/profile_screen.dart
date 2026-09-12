@@ -72,6 +72,12 @@ class ProfileScreen extends StatelessWidget {
                     value: employee.department.code,
                   ),
                   _DetailRow(
+                    label: 'Work email',
+                    value: employee.hasWorkEmail
+                        ? employee.workEmail
+                        : 'Not provided',
+                  ),
+                  _DetailRow(
                     label: 'Mobile',
                     value:
                         (employee.phone == null ||
@@ -91,8 +97,11 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 24),
             OutlinedButton(
               key: const Key('sign-out-button'),
-              onPressed: () {
-                session.logout();
+              onPressed: () async {
+                await session.logout();
+                if (!context.mounted) {
+                  return;
+                }
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
                   (route) => false,
