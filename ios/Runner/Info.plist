@@ -28,6 +28,10 @@
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>PEAM uses Face ID to confirm it is you before recording attendance. Your face data stays on this device and is never stored by PEAM.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>PEAM uses your location only to confirm you are inside the event geofence before attendance is recorded.</string>
+	<key>GMSApiKey</key>
+	<string>$(GOOGLE_MAPS_API_KEY)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

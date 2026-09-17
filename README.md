@@ -48,6 +48,25 @@ Also run `docs/schema.sql` (includes `bind_employee_device`). Free-tier projects
 4. Replace the body with `supabase/templates/magic_link.html` (must include `{{ .Token }}` and must **not** include `{{ .ConfirmationURL }}`).
 5. Save, then request a new code from the app.
 
+## Maps and geofencing
+
+Check-in uses **device GPS** and a local radius check against the event’s `latitude`, `longitude`, and `geofence_radius_meters`. That does **not** need a Google API key.
+
+The map on the Check-in screen uses **Google Maps SDK**. Enable these APIs on a Google Cloud project, create an API key, and restrict it to the PEAM Android/iOS apps:
+
+- Maps SDK for Android
+- Maps SDK for iOS
+
+Add the key to `.env`:
+
+```
+GOOGLE_MAPS_API_KEY=your-key
+```
+
+Android reads that value at build time. For iOS, copy `ios/Flutter/MapsSecrets.xcconfig.example` to `ios/Flutter/MapsSecrets.xcconfig` and set the same key.
+
+Geocoding API and Places API are **not** required on the phone. HR already sets the venue pin in peam-web.
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.

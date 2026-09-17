@@ -12,6 +12,7 @@ import '../services/connectivity_controller.dart';
 import '../services/email_mask.dart';
 import '../services/employee_auth_api.dart';
 import '../services/events_catalog.dart';
+import '../services/geofence.dart';
 import '../services/push_notification_service.dart';
 
 export 'session_scope.dart';
@@ -82,6 +83,7 @@ class SessionController extends ChangeNotifier {
   bool isSyncing = false;
   bool isLoadingEvents = false;
   String? eventsError;
+  GeofenceCheck? stagedGeofence;
 
   List<Employee> get accounts => List.unmodifiable(_accounts);
   List<AttendanceRecord> get history => List.unmodifiable(_history);
@@ -401,6 +403,7 @@ class SessionController extends ChangeNotifier {
     searchQuery = '';
     statusFilter = null;
     eventsError = null;
+    stagedGeofence = null;
     if (_eventsCatalog != null) {
       _events = const [];
     }
@@ -461,6 +464,10 @@ class SessionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void stageGeofence(GeofenceCheck? check) {
+    stagedGeofence = check;
+  }
+
   void simulateOffline() {
     _connectivity.simulateOffline();
   }
@@ -487,16 +494,21 @@ class SessionController extends ChangeNotifier {
       return;
     }
 
+    final staged = stagedGeofence;
+    if (staged != null && !staged.isInside) {
+      return;
+    }
+
     final recordedOffline = !_connectivity.isOnline;
     final record = AttendanceRecord(
       clientRecordId: newClientRecordId(),
       event: event,
       employee: currentEmployee,
       checkInAt: checkInAt,
-      checkInLatitude: event.location.latitude,
-      checkInLongitude: event.location.longitude,
+      checkInLatitude: staged?.position.latitude ?? event.location.latitude,
+      checkInLongitude: staged?.position.longitude ?? event.location.longitude,
       recordedOffline: recordedOffline,
-      geofenceVerified: true,
+      geofenceVerified: staged?.isInside ?? true,
       biometricVerified: true,
       verificationStatus: VerificationStatus.verified,
       attendanceStatus: AttendanceStatus.incomplete,
@@ -505,6 +517,7 @@ class SessionController extends ChangeNotifier {
     );
     await _local.upsert(record);
     lastAttendance = record;
+    stagedGeofence = null;
     await _reloadHistory();
     await addNotification(
       title: recordedOffline

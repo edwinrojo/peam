@@ -7,8 +7,10 @@ import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/notifications_screen.dart';
 import 'services/biometric_auth_service.dart';
+import 'services/location_service.dart';
 import 'services/push_notification_service.dart';
 import 'state/biometric_scope.dart';
+import 'state/location_scope.dart';
 import 'state/session_controller.dart';
 import 'theme/app_theme.dart';
 import 'widgets/peam_logo.dart';
@@ -19,11 +21,13 @@ class PeamApp extends StatefulWidget {
     this.session,
     this.pushNotifications,
     this.biometricAuth,
+    this.locationService,
   });
 
   final SessionController? session;
   final PushNotificationService? pushNotifications;
   final BiometricAuthService? biometricAuth;
+  final LocationService? locationService;
 
   @override
   State<PeamApp> createState() => _PeamAppState();
@@ -40,6 +44,9 @@ class _PeamAppState extends State<PeamApp> {
 
   late final BiometricAuthService _biometricAuth =
       widget.biometricAuth ?? const StubBiometricAuthService();
+
+  late final LocationService _locationService =
+      widget.locationService ?? const StubLocationService();
 
   bool _ready = false;
 
@@ -70,22 +77,25 @@ class _PeamAppState extends State<PeamApp> {
       controller: _session,
       child: BiometricAuthScope(
         service: _biometricAuth,
-        child: MaterialApp(
-          title: 'PEAM-Registry',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.light(),
-          home: !_ready
-              ? const _SessionRestoreScreen()
-              : _session.employee != null
-              ? const MainShell()
-              : const LoginScreen(),
-          routes: {
-            MainShell.routeName: (_) => const MainShell(),
-            CheckInScreen.routeName: (_) => const CheckInScreen(),
-            BiometricScreen.routeName: (_) => const BiometricScreen(),
-            ConfirmationScreen.routeName: (_) => const ConfirmationScreen(),
-            NotificationsScreen.routeName: (_) => const NotificationsScreen(),
-          },
+        child: LocationScope(
+          service: _locationService,
+          child: MaterialApp(
+            title: 'PEAM-Registry',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light(),
+            home: !_ready
+                ? const _SessionRestoreScreen()
+                : _session.employee != null
+                ? const MainShell()
+                : const LoginScreen(),
+            routes: {
+              MainShell.routeName: (_) => const MainShell(),
+              CheckInScreen.routeName: (_) => const CheckInScreen(),
+              BiometricScreen.routeName: (_) => const BiometricScreen(),
+              ConfirmationScreen.routeName: (_) => const ConfirmationScreen(),
+              NotificationsScreen.routeName: (_) => const NotificationsScreen(),
+            },
+          ),
         ),
       ),
     );

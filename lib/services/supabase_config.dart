@@ -16,7 +16,8 @@ class SupabaseConfig {
     } catch (_) {}
   }
 
-  static String get url => normalizeProjectUrl(_read('SUPABASE_URL', _defineUrl));
+  static String get url =>
+      normalizeProjectUrl(_read('SUPABASE_URL', _defineUrl));
 
   static String get anonKey => _read('SUPABASE_ANON_KEY', _defineAnonKey);
 

@@ -9,6 +9,7 @@ import 'services/biometric_auth_service.dart';
 import 'services/connectivity_controller.dart';
 import 'services/employee_auth_api.dart';
 import 'services/events_catalog.dart';
+import 'services/location_service.dart';
 import 'services/push_notification_service.dart';
 import 'services/sqlite_attendance_database.dart';
 import 'services/supabase_config.dart';
@@ -55,6 +56,7 @@ Future<void> main() async {
     PeamApp(
       pushNotifications: pushNotifications,
       biometricAuth: DeviceBiometricAuthService(),
+      locationService: const DeviceLocationService(),
       session: SessionController(
         pushNotifications: pushNotifications,
         localStore: localStore,

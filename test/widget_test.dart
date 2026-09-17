@@ -4,6 +4,7 @@ import 'package:peam/app.dart';
 import 'package:peam/data/sample_data.dart';
 import 'package:peam/services/auth_session_store.dart';
 import 'package:peam/services/biometric_auth_service.dart';
+import 'package:peam/services/location_service.dart';
 import 'package:peam/state/session_controller.dart';
 
 void main() {
@@ -114,6 +115,36 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Official events'), findsOneWidget);
+  });
+
+  testWidgets('check-in stays on the event when GPS is outside the geofence', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const PeamApp(
+        locationService: StubLocationService(
+          position: DevicePosition(latitude: 7.1, longitude: 125.6),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _loginAsDemo(tester);
+
+    await tester.ensureVisible(
+      find.byKey(const Key('event-card-evt-assembly')),
+    );
+    await tester.tap(find.byKey(const Key('event-card-evt-assembly')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Outside the event area'), findsOneWidget);
+    expect(find.text('Recheck location'), findsOneWidget);
+    expect(find.text('Verify it is you'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('check-in-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Verify it is you'), findsNothing);
+    expect(find.text('Check in'), findsOneWidget);
   });
 
   testWidgets('failed biometric stays on the authenticate screen', (

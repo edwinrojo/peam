@@ -4,6 +4,32 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+fun loadDotEnv(file: java.io.File): Map<String, String> {
+    if (!file.exists()) {
+        return emptyMap()
+    }
+    return file.readLines().mapNotNull { line ->
+        val trimmed = line.trim()
+        if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+            return@mapNotNull null
+        }
+        val idx = trimmed.indexOf('=')
+        if (idx <= 0) {
+            return@mapNotNull null
+        }
+        val key = trimmed.substring(0, idx).trim()
+        var value = trimmed.substring(idx + 1).trim()
+        if (value.length >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+            value = value.substring(1, value.length - 1)
+        }
+        key to value
+    }.toMap()
+}
+
+val mapsApiKey =
+    loadDotEnv(rootProject.file("../.env"))["GOOGLE_MAPS_API_KEY"]
+        ?: ""
+
 android {
     namespace = "com.example.peam"
     compileSdk = flutter.compileSdkVersion
@@ -25,6 +51,7 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = mapsApiKey
     }
 
     buildTypes {
