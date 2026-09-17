@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
-import '../theme/app_vectors.dart';
-import 'app_vector.dart';
 
 class PeamLogo extends StatelessWidget {
   const PeamLogo({super.key, this.size = 72, this.showWordmark = false});
+
+  static const assetPath = 'assets/branding/app_icon.png';
 
   final double size;
   final bool showWordmark;
@@ -15,13 +15,17 @@ class PeamLogo extends StatelessWidget {
     final mark = Container(
       width: size,
       height: size,
-      padding: EdgeInsets.all(size * 0.12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(size * 0.32),
+        borderRadius: BorderRadius.circular(size * 0.28),
         boxShadow: AppShadows.soft,
       ),
-      child: AppVector(AppVectors.logoMark, width: size, height: size),
+      clipBehavior: Clip.antiAlias,
+      child: Image.asset(
+        assetPath,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+      ),
     );
 
     if (!showWordmark) {
