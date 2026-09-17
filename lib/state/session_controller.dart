@@ -11,6 +11,7 @@ import '../services/client_ids.dart';
 import '../services/connectivity_controller.dart';
 import '../services/email_mask.dart';
 import '../services/employee_auth_api.dart';
+import '../services/events_catalog.dart';
 import '../services/push_notification_service.dart';
 
 export 'session_scope.dart';
@@ -34,8 +35,11 @@ class SessionController extends ChangeNotifier {
     AttendanceSyncService syncService = const AttendanceSyncService(),
     AuthSessionStore? authStore,
     EmployeeAuthApi? liveAuth,
+    EventsCatalog? eventsCatalog,
     this._prototypeEmailCode = SampleData.prototypeEmailCode,
   }) : _remoteAuth = liveAuth,
+       _eventsCatalog = eventsCatalog,
+       _events = eventsCatalog == null ? List.of(SampleData.events) : const [],
        _push =
            pushNotifications ??
            PushNotificationService(enableSystemBanners: false),
@@ -57,10 +61,12 @@ class SessionController extends ChangeNotifier {
   final AttendanceSyncService _sync;
   final AuthSessionStore _authStore;
   final EmployeeAuthApi? _remoteAuth;
+  final EventsCatalog? _eventsCatalog;
   final String _prototypeEmailCode;
   final bool _ownsConnectivity;
 
   late List<Employee> _accounts;
+  List<ProvincialEvent> _events;
   LoginChallenge? pendingChallenge;
   bool deviceChangeRequired = false;
   String? _deviceChangeTicket;
@@ -74,6 +80,8 @@ class SessionController extends ChangeNotifier {
   EventStatus? statusFilter;
   int remoteRecordCount = 0;
   bool isSyncing = false;
+  bool isLoadingEvents = false;
+  String? eventsError;
 
   List<Employee> get accounts => List.unmodifiable(_accounts);
   List<AttendanceRecord> get history => List.unmodifiable(_history);
@@ -95,9 +103,9 @@ class SessionController extends ChangeNotifier {
 
   List<ProvincialEvent> get visibleEvents {
     final query = searchQuery.trim().toLowerCase();
-    return SampleData.events.where((event) {
+    return _events.where((event) {
       final matchesStatus =
-          statusFilter == null || event.status == statusFilter;
+          statusFilter == null || event.effectiveStatus() == statusFilter;
       final matchesQuery =
           query.isEmpty ||
           event.name.toLowerCase().contains(query) ||
@@ -166,6 +174,7 @@ class SessionController extends ChangeNotifier {
         deviceUid: deviceUid,
       );
       await _reloadHistory();
+      await refreshEvents();
       return;
     }
     final session = await _authStore.readSession();
@@ -184,6 +193,7 @@ class SessionController extends ChangeNotifier {
     }
     employee = account.copyWith(deviceUid: deviceUid);
     await _reloadHistory();
+    await refreshEvents();
   }
 
   Future<void> _applyStoredBindings() async {
@@ -308,6 +318,7 @@ class SessionController extends ChangeNotifier {
       deviceUid: deviceUid,
     );
     await _reloadHistory();
+    await refreshEvents();
     return null;
   }
 
@@ -389,6 +400,10 @@ class SessionController extends ChangeNotifier {
     remoteRecordCount = 0;
     searchQuery = '';
     statusFilter = null;
+    eventsError = null;
+    if (_eventsCatalog != null) {
+      _events = const [];
+    }
     notifyListeners();
   }
 
@@ -402,6 +417,33 @@ class SessionController extends ChangeNotifier {
 
   String _platformName() {
     return defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
+  }
+
+  Future<void> refreshEvents() async {
+    final catalog = _eventsCatalog;
+    if (catalog == null) {
+      _events = List.of(SampleData.events);
+      eventsError = null;
+      isLoadingEvents = false;
+      notifyListeners();
+      return;
+    }
+
+    isLoadingEvents = true;
+    notifyListeners();
+    try {
+      _events = await catalog.listVisible();
+      eventsError = null;
+    } catch (_) {
+      if (_events.isEmpty) {
+        eventsError = 'Could not load events. Pull down to try again.';
+      } else {
+        eventsError = 'Could not refresh events. Showing the last list.';
+      }
+    } finally {
+      isLoadingEvents = false;
+      notifyListeners();
+    }
   }
 
   void updateSearch(String value) {

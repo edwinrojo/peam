@@ -19,7 +19,7 @@ class EventCard extends StatelessWidget {
   final String actionLabel;
 
   Color get _accent {
-    return switch (event.status) {
+    return switch (event.effectiveStatus()) {
       EventStatus.ongoing => AppColors.mint,
       EventStatus.published => AppColors.sky,
       EventStatus.completed => AppColors.lavender,
@@ -28,7 +28,7 @@ class EventCard extends StatelessWidget {
   }
 
   Color get _accentDeep {
-    return switch (event.status) {
+    return switch (event.effectiveStatus()) {
       EventStatus.ongoing => AppColors.mintDeep,
       EventStatus.published => AppColors.skyDeep,
       EventStatus.completed => AppColors.lavenderDeep,
@@ -37,7 +37,7 @@ class EventCard extends StatelessWidget {
   }
 
   String get _badgeAsset {
-    return switch (event.status) {
+    return switch (event.effectiveStatus()) {
       EventStatus.ongoing => AppVectors.categoryOngoing,
       EventStatus.published => AppVectors.categoryUpcoming,
       EventStatus.completed => AppVectors.ticketPass,

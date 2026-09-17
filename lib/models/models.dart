@@ -99,6 +99,40 @@ class ProvincialEvent {
 
   String get scheduleLabel => '$startTime – $endTime';
 
+  DateTime? get startsAt => _dateAtClock(eventDate, startTime);
+
+  DateTime? get endsAt {
+    final start = startsAt;
+    final end = _dateAtClock(eventDate, endTime);
+    if (start != null && end != null && !end.isAfter(start)) {
+      return end.add(const Duration(days: 1));
+    }
+    return end;
+  }
+
+  /// Employee-facing status from the event schedule.
+  /// HR `completed` / `cancelled` / `draft` stay as stored.
+  EventStatus effectiveStatus([DateTime? now]) {
+    if (status == EventStatus.draft ||
+        status == EventStatus.cancelled ||
+        status == EventStatus.completed) {
+      return status;
+    }
+    final clock = now ?? DateTime.now();
+    final start = startsAt;
+    final end = endsAt;
+    if (start == null || end == null) {
+      return status;
+    }
+    if (clock.isBefore(start)) {
+      return EventStatus.published;
+    }
+    if (!clock.isBefore(end)) {
+      return EventStatus.completed;
+    }
+    return EventStatus.ongoing;
+  }
+
   String get dateLabel {
     const months = [
       'January',
@@ -126,13 +160,50 @@ class ProvincialEvent {
     return '${weekdays[eventDate.weekday - 1]}, ${months[eventDate.month - 1]} ${eventDate.day}, ${eventDate.year}';
   }
 
-  String get statusLabel => switch (status) {
+  String get statusLabel => switch (effectiveStatus()) {
     EventStatus.ongoing => 'Ongoing',
     EventStatus.published => 'Upcoming',
     EventStatus.completed => 'Completed',
     EventStatus.cancelled => 'Cancelled',
     EventStatus.draft => 'Draft',
   };
+}
+
+({int hour, int minute})? parseEventClock(String raw) {
+  final trimmed = raw.trim();
+  final twelveHour = RegExp(
+    r'^(\d{1,2}):(\d{2})\s*(AM|PM)$',
+    caseSensitive: false,
+  ).firstMatch(trimmed);
+  if (twelveHour != null) {
+    var hour = int.parse(twelveHour.group(1)!);
+    final minute = int.parse(twelveHour.group(2)!);
+    final period = twelveHour.group(3)!.toUpperCase();
+    if (period == 'AM') {
+      if (hour == 12) {
+        hour = 0;
+      }
+    } else if (hour != 12) {
+      hour += 12;
+    }
+    return (hour: hour, minute: minute);
+  }
+  final twentyFour = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(trimmed);
+  if (twentyFour == null) {
+    return null;
+  }
+  return (
+    hour: int.parse(twentyFour.group(1)!),
+    minute: int.parse(twentyFour.group(2)!),
+  );
+}
+
+DateTime? _dateAtClock(DateTime date, String clock) {
+  final parsed = parseEventClock(clock);
+  if (parsed == null) {
+    return null;
+  }
+  return DateTime(date.year, date.month, date.day, parsed.hour, parsed.minute);
 }
 
 class AttendanceRecord {

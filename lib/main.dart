@@ -8,6 +8,7 @@ import 'services/auth_session_store.dart';
 import 'services/biometric_auth_service.dart';
 import 'services/connectivity_controller.dart';
 import 'services/employee_auth_api.dart';
+import 'services/events_catalog.dart';
 import 'services/push_notification_service.dart';
 import 'services/sqlite_attendance_database.dart';
 import 'services/supabase_config.dart';
@@ -25,12 +26,17 @@ Future<void> main() async {
   await SupabaseConfig.load();
 
   EmployeeAuthApi? remoteAuth;
+  EventsCatalog? eventsCatalog;
   if (SupabaseConfig.isConfigured) {
     await Supabase.initialize(
       url: SupabaseConfig.url,
       publishableKey: SupabaseConfig.anonKey,
     );
     remoteAuth = EmployeeAuthApi();
+    eventsCatalog = CachedEventsCatalog(
+      remote: SupabaseEventsCatalog(),
+      cache: FileEventsCache(),
+    );
   }
 
   late final AttendanceLocalStore localStore;
@@ -56,6 +62,7 @@ Future<void> main() async {
         connectivity: connectivity,
         authStore: FileAuthSessionStore(),
         liveAuth: remoteAuth,
+        eventsCatalog: eventsCatalog,
       ),
     ),
   );

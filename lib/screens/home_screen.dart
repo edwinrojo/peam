@@ -32,194 +32,230 @@ class _HomeScreenState extends State<HomeScreen> {
     final employee = session.employee;
     final events = session.visibleEvents;
     final ongoingCount = events
-        .where((event) => event.status == EventStatus.ongoing)
+        .where((event) => event.effectiveStatus() == EventStatus.ongoing)
         .length;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.peach,
-                  borderRadius: BorderRadius.circular(AppRadii.pill),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.star_rounded,
-                      size: 16,
-                      color: AppColors.peachDeep,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      employee?.department.code ?? 'PEAM',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                        color: AppColors.ink,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              _RoundIconButton(icon: Icons.search_rounded, onTap: () {}),
-              const SizedBox(width: 8),
-              ListenableBuilder(
-                listenable: session,
-                builder: (context, _) {
-                  return _NotificationButton(
-                    unreadCount: session.unreadNotificationCount,
-                    onTap: () {
-                      Navigator.of(
-                        context,
-                      ).pushNamed(NotificationsScreen.routeName);
-                    },
-                  );
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 22),
-          Text(
-            'Good day, ${employee?.firstName ?? 'Employee'}',
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: AppColors.muted,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Attendance Made Simple',
-            style: TextStyle(
-              fontSize: 32,
-              height: 1.1,
-              fontWeight: FontWeight.w800,
-              color: AppColors.ink,
-              letterSpacing: -0.8,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            employee == null
-                ? 'Select an official provincial event to check in.'
-                : 'Device bound to ${employee.deviceName}',
-            style: const TextStyle(color: AppColors.muted, height: 1.4),
-          ),
-          const SizedBox(height: 14),
-          _OfflineSyncBanner(session: session),
-          const SizedBox(height: 18),
-          const AppVector(AppVectors.heroAttendance, height: 112),
-          const SizedBox(height: 18),
-          TextField(
-            key: const Key('home-search'),
-            controller: _searchController,
-            onChanged: session.updateSearch,
-            decoration: const InputDecoration(
-              hintText: 'Search events or venues',
-              prefixIcon: Icon(Icons.search_rounded),
-            ),
-          ),
-          const SizedBox(height: 18),
-          SizedBox(
-            height: 118,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
+    return RefreshIndicator(
+      onRefresh: session.refreshEvents,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
               children: [
-                _CategoryTile(
-                  label: 'All',
-                  asset: AppVectors.categoryAll,
-                  color: AppColors.lavender,
-                  selected: session.statusFilter == null,
-                  onTap: () => session.updateStatusFilter(null),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.peach,
+                    borderRadius: BorderRadius.circular(AppRadii.pill),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.star_rounded,
+                        size: 16,
+                        color: AppColors.peachDeep,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        employee?.department.code ?? 'PEAM',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          color: AppColors.ink,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                _CategoryTile(
-                  label: 'Ongoing',
-                  asset: AppVectors.categoryOngoing,
-                  color: AppColors.mint,
-                  badge: ongoingCount > 0 ? '$ongoingCount' : null,
-                  selected: session.statusFilter == EventStatus.ongoing,
-                  onTap: () => session.updateStatusFilter(EventStatus.ongoing),
-                ),
-                _CategoryTile(
-                  label: 'Upcoming',
-                  asset: AppVectors.categoryUpcoming,
-                  color: AppColors.sky,
-                  selected: session.statusFilter == EventStatus.published,
-                  onTap: () =>
-                      session.updateStatusFilter(EventStatus.published),
-                ),
-                _CategoryTile(
-                  label: 'Done',
-                  asset: AppVectors.categoryDone,
-                  color: AppColors.peach,
-                  selected: session.statusFilter == EventStatus.completed,
-                  onTap: () =>
-                      session.updateStatusFilter(EventStatus.completed),
+                const Spacer(),
+                _RoundIconButton(icon: Icons.search_rounded, onTap: () {}),
+                const SizedBox(width: 8),
+                ListenableBuilder(
+                  listenable: session,
+                  builder: (context, _) {
+                    return _NotificationButton(
+                      unreadCount: session.unreadNotificationCount,
+                      onTap: () {
+                        Navigator.of(
+                          context,
+                        ).pushNamed(NotificationsScreen.routeName);
+                      },
+                    );
+                  },
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 22),
-          Row(
-            children: [
-              const Text(
-                'Official events',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+            const SizedBox(height: 22),
+            Text(
+              'Good day, ${employee?.firstName ?? 'Employee'}',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.muted,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Attendance Made Simple',
+              style: TextStyle(
+                fontSize: 32,
+                height: 1.1,
+                fontWeight: FontWeight.w800,
+                color: AppColors.ink,
+                letterSpacing: -0.8,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              employee == null
+                  ? 'Select an official provincial event to check in.'
+                  : 'Device bound to ${employee.deviceName}',
+              style: const TextStyle(color: AppColors.muted, height: 1.4),
+            ),
+            const SizedBox(height: 14),
+            _OfflineSyncBanner(session: session),
+            const SizedBox(height: 18),
+            const AppVector(AppVectors.heroAttendance, height: 112),
+            const SizedBox(height: 18),
+            TextField(
+              key: const Key('home-search'),
+              controller: _searchController,
+              onChanged: session.updateSearch,
+              decoration: const InputDecoration(
+                hintText: 'Search events or venues',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              height: 118,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  _CategoryTile(
+                    label: 'All',
+                    asset: AppVectors.categoryAll,
+                    color: AppColors.lavender,
+                    selected: session.statusFilter == null,
+                    onTap: () => session.updateStatusFilter(null),
+                  ),
+                  _CategoryTile(
+                    label: 'Ongoing',
+                    asset: AppVectors.categoryOngoing,
+                    color: AppColors.mint,
+                    badge: ongoingCount > 0 ? '$ongoingCount' : null,
+                    selected: session.statusFilter == EventStatus.ongoing,
+                    onTap: () =>
+                        session.updateStatusFilter(EventStatus.ongoing),
+                  ),
+                  _CategoryTile(
+                    label: 'Upcoming',
+                    asset: AppVectors.categoryUpcoming,
+                    color: AppColors.sky,
+                    selected: session.statusFilter == EventStatus.published,
+                    onTap: () =>
+                        session.updateStatusFilter(EventStatus.published),
+                  ),
+                  _CategoryTile(
+                    label: 'Done',
+                    asset: AppVectors.categoryDone,
+                    color: AppColors.peach,
+                    selected: session.statusFilter == EventStatus.completed,
+                    onTap: () =>
+                        session.updateStatusFilter(EventStatus.completed),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                const Text(
+                  'Official events',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${events.length} found',
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            if (session.eventsError != null) ...[
+              SoftCard(
+                color: AppColors.peach,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                child: Text(
+                  session.eventsError!,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    height: 1.35,
+                    color: AppColors.ink,
+                  ),
                 ),
               ),
-              const Spacer(),
-              Text(
-                '${events.length} found',
-                style: const TextStyle(
-                  color: AppColors.muted,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-              ),
+              const SizedBox(height: 14),
             ],
-          ),
-          const SizedBox(height: 14),
-          if (events.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 48),
-              child: Center(child: Text('No events match your search.')),
-            )
-          else
-            ...events.map((event) {
-              final recorded = session.recordFor(event.id);
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: EventCard(
-                  event: event,
-                  actionLabel: recorded == null
-                      ? 'Open'
-                      : recorded.isPending
-                      ? 'Pending'
-                      : 'Recorded',
-                  onTap: () {
-                    session.selectEvent(event);
-                    Navigator.of(
-                      context,
-                    ).pushNamed(CheckInScreen.routeName, arguments: event);
-                  },
+            if (session.isLoadingEvents && events.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 48),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (events.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 48),
+                child: Center(
+                  child: Text(
+                    session.searchQuery.trim().isEmpty &&
+                            session.statusFilter == null
+                        ? 'No published events yet.'
+                        : 'No events match your search.',
+                  ),
                 ),
-              );
-            }),
-        ],
+              )
+            else
+              ...events.map((event) {
+                final recorded = session.recordFor(event.id);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: EventCard(
+                    event: event,
+                    actionLabel: recorded == null
+                        ? 'Open'
+                        : recorded.isPending
+                        ? 'Pending'
+                        : 'Recorded',
+                    onTap: () {
+                      session.selectEvent(event);
+                      Navigator.of(
+                        context,
+                      ).pushNamed(CheckInScreen.routeName, arguments: event);
+                    },
+                  ),
+                );
+              }),
+          ],
+        ),
       ),
     );
   }
