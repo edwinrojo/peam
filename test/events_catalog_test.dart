@@ -54,6 +54,10 @@ void main() {
       event.effectiveStatus(DateTime(2026, 9, 17, 17, 0)),
       EventStatus.completed,
     );
+    expect(event.allowsCheckIn(DateTime(2026, 9, 17, 16, 59)), isTrue);
+    expect(event.allowsCheckIn(DateTime(2026, 9, 17, 17, 0)), isFalse);
+    expect(event.cardDateLabel, 'Thu, Sep 17, 2026');
+    expect(event.dateLabel, 'Thursday, September 17, 2026');
   });
 
   test('drops draft and cancelled events from the employee list', () {
@@ -105,6 +109,26 @@ void main() {
       );
     },
   );
+
+  test('search matches events even when a status filter is selected', () async {
+    final session = SessionController();
+    addTearDown(session.dispose);
+    await session.completePrototypeLogin(
+      SampleData.demoEmployee.employeeNumber,
+    );
+
+    session.updateStatusFilter(EventStatus.ongoing);
+    expect(
+      session.visibleEvents.any((event) => event.id == 'evt-health'),
+      isFalse,
+    );
+
+    session.updateSearch('Malalag');
+    expect(
+      session.visibleEvents.any((event) => event.id == 'evt-health'),
+      isTrue,
+    );
+  });
 
   test('falls back to the cached event list when refresh fails', () async {
     final cache = MemoryEventsCache();

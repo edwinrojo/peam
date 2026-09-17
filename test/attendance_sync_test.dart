@@ -98,4 +98,31 @@ void main() {
       expect(session.remoteRecordCount, 1);
     },
   );
+
+  test('session rejects check-in after the event end time', () async {
+    final session = SessionController(
+      localStore: MemoryAttendanceLocalStore(),
+      remoteStore: MemoryAttendanceRemoteStore(),
+      connectivity: ConnectivityController(),
+      pushNotifications: PushNotificationService(enableSystemBanners: false),
+    );
+    addTearDown(session.dispose);
+
+    final error = await session.completePrototypeLogin(
+      SampleData.demoEmployee.employeeNumber,
+    );
+    expect(error, isNull);
+
+    final outreach = SampleData.events.firstWhere(
+      (event) => event.id == 'evt-health',
+    );
+    session.selectEvent(outreach);
+    await session.confirmAttendance(checkInAt: DateTime(2026, 9, 17, 16, 0));
+
+    expect(
+      session.history.where((record) => record.event.id == 'evt-health'),
+      isEmpty,
+    );
+    expect(session.lastAttendance?.event.id, isNot('evt-health'));
+  });
 }

@@ -48,7 +48,6 @@ class EventCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SoftCard(
-      key: ValueKey('event-card-${event.id}'),
       onTap: onTap,
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -108,43 +107,26 @@ class EventCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
-                child: Wrap(
-                  spacing: 14,
-                  runSpacing: 8,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _Meta(
+                      icon: Icons.calendar_today_outlined,
+                      label: event.cardDateLabel,
+                    ),
+                    const SizedBox(height: 8),
                     _Meta(
                       icon: Icons.schedule_outlined,
                       label: event.scheduleLabel,
                     ),
-                    _Meta(
-                      icon: Icons.calendar_today_outlined,
-                      label: event.dateLabel.split(',').first,
-                    ),
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                decoration: const BoxDecoration(
-                  color: AppColors.button,
-                  borderRadius: BorderRadius.all(
-                    Radius.circular(AppRadii.pill),
-                  ),
-                ),
-                child: Text(
-                  actionLabel,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
+              const SizedBox(width: 12),
+              _ActionBadge(label: actionLabel),
             ],
           ),
         ],
@@ -184,6 +166,69 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
+class _ActionBadge extends StatelessWidget {
+  const _ActionBadge({required this.label});
+
+  final String label;
+
+  ({Color fill, Color foreground, IconData icon}) get _style {
+    return switch (label) {
+      'Open' => (
+        fill: AppColors.mint,
+        foreground: AppColors.mintDeep,
+        icon: Icons.login_rounded,
+      ),
+      'Ended' => (
+        fill: AppColors.lavender,
+        foreground: AppColors.lavenderDeep,
+        icon: Icons.event_busy_outlined,
+      ),
+      'Pending' => (
+        fill: AppColors.peach,
+        foreground: AppColors.peachDeep,
+        icon: Icons.cloud_off_outlined,
+      ),
+      'Recorded' => (
+        fill: AppColors.sky,
+        foreground: AppColors.skyDeep,
+        icon: Icons.check_rounded,
+      ),
+      _ => (
+        fill: AppColors.line,
+        foreground: AppColors.ink,
+        icon: Icons.chevron_right_rounded,
+      ),
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final style = _style;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
+      decoration: BoxDecoration(
+        color: style.fill,
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(style.icon, size: 15, color: style.foreground),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: style.foreground,
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Meta extends StatelessWidget {
   const _Meta({required this.icon, required this.label});
 
@@ -193,16 +238,17 @@ class _Meta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 15, color: AppColors.muted),
         const SizedBox(width: 5),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.muted,
-            fontWeight: FontWeight.w500,
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.muted,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],

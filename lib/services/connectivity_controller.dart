@@ -3,11 +3,8 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 
-/// Prototype connectivity: sync follows [isOnline], which starts offline so
-/// check-ins stay pending until the employee simulates restored connectivity.
-/// [deviceHasNetwork] is informational (Room/Core Data sync still waits on
-/// the prototype toggle, matching the “store locally, upload when connected”
-/// demo).
+/// Attendance sync follows device connectivity when [listenToDevice] is true.
+/// Tests keep [listenToDevice] false and use [simulateOnline] / [simulateOffline].
 class ConnectivityController extends ChangeNotifier {
   ConnectivityController({this.listenToDevice = false});
 
@@ -25,27 +22,34 @@ class ConnectivityController extends ChangeNotifier {
       return;
     }
     final results = await Connectivity().checkConnectivity();
-    _deviceHasNetwork = _hasNetwork(results);
-    notifyListeners();
+    _setDeviceNetwork(_hasNetwork(results));
     _subscription = Connectivity().onConnectivityChanged.listen((results) {
-      _deviceHasNetwork = _hasNetwork(results);
-      notifyListeners();
+      _setDeviceNetwork(_hasNetwork(results));
     });
   }
 
   void simulateOffline() {
-    if (!_isOnline) {
-      return;
-    }
-    _isOnline = false;
-    notifyListeners();
+    _setOnline(false);
   }
 
   void simulateOnline() {
-    if (_isOnline) {
+    _setOnline(true);
+  }
+
+  void _setDeviceNetwork(bool hasNetwork) {
+    final changed = _deviceHasNetwork != hasNetwork || _isOnline != hasNetwork;
+    _deviceHasNetwork = hasNetwork;
+    _isOnline = hasNetwork;
+    if (changed) {
+      notifyListeners();
+    }
+  }
+
+  void _setOnline(bool online) {
+    if (_isOnline == online) {
       return;
     }
-    _isOnline = true;
+    _isOnline = online;
     notifyListeners();
   }
 

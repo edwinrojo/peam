@@ -133,6 +133,21 @@ class ProvincialEvent {
     return EventStatus.ongoing;
   }
 
+  /// Check-in is allowed until the scheduled end time.
+  /// HR `completed` / `cancelled` / `draft` stay closed.
+  bool allowsCheckIn([DateTime? now]) {
+    if (status == EventStatus.draft ||
+        status == EventStatus.cancelled ||
+        status == EventStatus.completed) {
+      return false;
+    }
+    final end = endsAt;
+    if (end == null) {
+      return status == EventStatus.ongoing;
+    }
+    return (now ?? DateTime.now()).isBefore(end);
+  }
+
   String get dateLabel {
     const months = [
       'January',
@@ -157,6 +172,25 @@ class ProvincialEvent {
       'Saturday',
       'Sunday',
     ];
+    return '${weekdays[eventDate.weekday - 1]}, ${months[eventDate.month - 1]} ${eventDate.day}, ${eventDate.year}';
+  }
+
+  String get cardDateLabel {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return '${weekdays[eventDate.weekday - 1]}, ${months[eventDate.month - 1]} ${eventDate.day}, ${eventDate.year}';
   }
 

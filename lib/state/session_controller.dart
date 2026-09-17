@@ -103,11 +103,16 @@ class SessionController extends ChangeNotifier {
     return null;
   }
 
-  List<ProvincialEvent> get visibleEvents {
+  List<ProvincialEvent> get visibleEvents => eventsMatching();
+
+  List<ProvincialEvent> eventsMatching({bool ignoreStatusFilter = false}) {
     final query = searchQuery.trim().toLowerCase();
+    final skipStatus = ignoreStatusFilter || query.isNotEmpty;
     return _events.where((event) {
       final matchesStatus =
-          statusFilter == null || event.effectiveStatus() == statusFilter;
+          skipStatus ||
+          statusFilter == null ||
+          event.effectiveStatus() == statusFilter;
       final matchesQuery =
           query.isEmpty ||
           event.name.toLowerCase().contains(query) ||
@@ -481,6 +486,10 @@ class SessionController extends ChangeNotifier {
     final currentEmployee = employee;
     final event = selectedEvent;
     if (currentEmployee == null || event == null) {
+      return;
+    }
+
+    if (!event.allowsCheckIn(checkInAt)) {
       return;
     }
 

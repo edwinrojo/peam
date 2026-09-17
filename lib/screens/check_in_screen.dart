@@ -46,6 +46,15 @@ class _CheckInScreenState extends State<CheckInScreen> {
     if (event == null) {
       return;
     }
+    if (!event.allowsCheckIn()) {
+      SessionScope.of(context).stageGeofence(null);
+      setState(() {
+        _loading = false;
+        _check = null;
+        _error = 'Check-in closed at ${event.endTime}. This event has ended.';
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -78,7 +87,10 @@ class _CheckInScreenState extends State<CheckInScreen> {
   void _continue() {
     final event = _event;
     final check = _check;
-    if (event == null || check == null || !check.isInside) {
+    if (event == null ||
+        !event.allowsCheckIn() ||
+        check == null ||
+        !check.isInside) {
       return;
     }
     SessionScope.of(context).selectEvent(event);
@@ -95,6 +107,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
 
     final check = _check;
     final inside = check?.isInside ?? false;
+    final windowOpen = event.allowsCheckIn();
 
     return Scaffold(
       appBar: AppBar(
@@ -144,6 +157,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
                             Text(
                               _loading
                                   ? 'Checking your location'
+                                  : !windowOpen
+                                  ? 'Check-in closed'
                                   : inside
                                   ? 'Location verified'
                                   : 'Outside the event area',
@@ -154,7 +169,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              event.venue,
+                              !windowOpen
+                                  ? 'Check-in closed at ${event.endTime}. This event has ended.'
+                                  : event.venue,
                               style: const TextStyle(
                                 color: AppColors.muted,
                                 fontSize: 13,
@@ -227,16 +244,20 @@ class _CheckInScreenState extends State<CheckInScreen> {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
               child: PrimaryButton(
                 key: const Key('check-in-button'),
-                label: _loading
+                label: !windowOpen
+                    ? 'Event ended'
+                    : _loading
                     ? 'Checking location'
                     : inside
                     ? 'Check-in'
                     : 'Recheck location',
-                icon: inside
+                icon: !windowOpen
+                    ? Icons.event_busy_rounded
+                    : inside
                     ? Icons.how_to_reg_rounded
                     : Icons.my_location_rounded,
                 loading: _loading,
-                onPressed: _loading
+                onPressed: !windowOpen || _loading
                     ? null
                     : inside
                     ? _continue
@@ -253,7 +274,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
     if (_loading) {
       return AppColors.sky;
     }
-    if (_error != null || _check?.isInside != true) {
+    if (_error != null ||
+        _event?.allowsCheckIn() != true ||
+        _check?.isInside != true) {
       return AppColors.peach;
     }
     return AppColors.mint;
@@ -262,6 +285,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
   IconData get _statusIcon {
     if (_loading) {
       return Icons.gps_fixed;
+    }
+    if (_event?.allowsCheckIn() != true) {
+      return Icons.event_busy_outlined;
     }
     if (_error != null) {
       return Icons.location_off_outlined;
@@ -283,6 +309,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
   }
 
   String _statusMessage(ProvincialEvent event) {
+    if (!event.allowsCheckIn()) {
+      return 'Check-in closed at ${event.endTime}. This event has ended.';
+    }
     if (_loading) {
       return 'Reading GPS to confirm you are inside the ${event.location.geofenceRadiusMeters} m geofence.';
     }

@@ -147,6 +147,27 @@ void main() {
     expect(find.text('Check in'), findsOneWidget);
   });
 
+  testWidgets('check-in is blocked after the event end time', (tester) async {
+    await _openApp(tester);
+    await _loginAsDemo(tester);
+
+    await tester.ensureVisible(find.byKey(const Key('event-card-evt-health')));
+    await tester.tap(find.byKey(const Key('event-card-evt-health')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Barangay Health Outreach'), findsOneWidget);
+    expect(find.text('Check-in closed'), findsOneWidget);
+    expect(find.text('Event ended'), findsOneWidget);
+    expect(find.textContaining('This event has ended'), findsOneWidget);
+    expect(find.text('Verify it is you'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('check-in-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Verify it is you'), findsNothing);
+    expect(find.text('Check in'), findsOneWidget);
+  });
+
   testWidgets('failed biometric stays on the authenticate screen', (
     tester,
   ) async {
@@ -218,11 +239,38 @@ void main() {
     await _openApp(tester);
     await _loginAsDemo(tester);
 
-    await tester.enterText(find.byKey(const Key('home-search')), 'Malalag');
+    await tester.tap(find.byKey(const Key('filter-ongoing')));
     await tester.pump();
+    expect(find.text('Barangay Health Outreach'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('home-search')));
+    await tester.pump();
+    await tester.enterText(find.byKey(const Key('home-search')), 'Malalag');
+    await tester.pumpAndSettle();
 
     expect(find.text('Barangay Health Outreach'), findsOneWidget);
     expect(find.text('Provincial Employees Assembly 2026'), findsNothing);
+    expect(find.byKey(const Key('filter-ongoing')), findsNothing);
+    expect(find.text('Attendance Made Simple'), findsNothing);
+    expect(find.byKey(const Key('home-search-clear')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('home-search-clear')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('home-search')), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('home-search')))
+          .controller
+          ?.text,
+      isEmpty,
+    );
+
+    await tester.tap(find.byKey(const Key('home-search-back')));
+    await tester.pump();
+
+    expect(find.text('Attendance Made Simple'), findsOneWidget);
+    expect(find.byKey(const Key('filter-ongoing')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('nav-history')));
     await tester.pumpAndSettle();

@@ -38,15 +38,20 @@ abstract final class SampleData {
   /// Stand-in for the email OTP HR would send from Supabase Auth.
   static const prototypeEmailCode = '123456';
 
+  static final _today = () {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }();
+
   static final events = <ProvincialEvent>[
     ProvincialEvent(
       id: 'evt-assembly',
       name: 'Provincial Employees Assembly 2026',
       description:
           'Annual assembly of provincial government employees at the Capitol grounds. Attendance is required for all regular plantilla personnel.',
-      eventDate: DateTime(2026, 8, 25),
+      eventDate: _today,
       startTime: '8:00 AM',
-      endTime: '5:00 PM',
+      endTime: '11:59 PM',
       venue: 'Provincial Capitol Grounds, Digos City',
       location: capitol,
       status: EventStatus.ongoing,

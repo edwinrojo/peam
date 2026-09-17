@@ -175,9 +175,7 @@ class _SyncPrototypeCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            online
-                ? 'Prototype connectivity: online'
-                : 'Prototype connectivity: offline',
+            online ? 'Online' : 'Offline',
             style: const TextStyle(
               fontWeight: FontWeight.w800,
               color: AppColors.ink,
@@ -186,8 +184,8 @@ class _SyncPrototypeCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             online
-                ? 'Pending local rows upload to a mock Supabase table, then are marked synced. Device network: ${session.deviceHasNetwork ? 'available' : 'none'}.'
-                : 'Check-ins are stored in the on-device SQLite database (Room / Core Data stand-in). They stay pending until connectivity is restored. Device network: ${session.deviceHasNetwork ? 'available' : 'none'}.',
+                ? 'This phone is connected. Pending attendance will upload to Supabase. You can still simulate a drop for testing.'
+                : 'No network on this phone. Check-ins stay on the device until connectivity returns.',
             style: const TextStyle(
               color: AppColors.ink,
               fontSize: 13,

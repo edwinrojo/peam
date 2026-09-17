@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/biometric_auth_service.dart';
 import '../state/biometric_scope.dart';
+import '../state/session_controller.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_vectors.dart';
 import '../widgets/app_vector.dart';
@@ -73,6 +74,14 @@ class _BiometricScreenState extends State<BiometricScreen> {
       setState(() {
         _scanning = false;
         _error = result.message;
+      });
+      return;
+    }
+    final event = SessionScope.of(context).selectedEvent;
+    if (event == null || !event.allowsCheckIn()) {
+      setState(() {
+        _scanning = false;
+        _error = 'Check-in closed. This event has ended.';
       });
       return;
     }
