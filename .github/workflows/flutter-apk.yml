@@ -46,6 +46,21 @@ jobs:
       - name: Run tests
         run: flutter test
 
+      - name: Write live env for APK
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "SUPABASE_URL / SUPABASE_ANON_KEY secrets are not set."
+            echo "The APK will keep the Demo sign-in hint."
+            test -f .env || cp .env.example .env
+          else
+            printf 'SUPABASE_URL=%s\nSUPABASE_ANON_KEY=%s\nGOOGLE_MAPS_API_KEY=%s\n' \
+              "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "${GOOGLE_MAPS_API_KEY:-}" > .env
+          fi
+
       - name: Build APK
         run: flutter build apk --release
 

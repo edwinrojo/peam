@@ -12,6 +12,13 @@ That link always points at the newest build. You can also open [Releases](https:
 
 Branch and pull-request builds still attach an APK under the workflow run (**Actions → Build Android APK → Artifacts**). Those expire; the Release file does not.
 
+Sign in shows **Demo** when the APK was built without real Supabase keys. GitHub cannot use your local `.env` (it is gitignored). Add repository secrets `SUPABASE_URL` and `SUPABASE_ANON_KEY` (same values as `.env`), then rebuild. Optional: `GOOGLE_MAPS_API_KEY`. Until those secrets exist, install a local build instead:
+
+```sh
+flutter build apk --release
+adb install -r build/app/outputs/flutter-apk/app-release.apk
+```
+
 ## Supabase employee login
 
 HR creates employees with `create_employee` in `docs/schema.sql`. The mobile app signs in with **Employee ID + email OTP**, then binds one phone.
