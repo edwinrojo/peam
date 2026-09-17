@@ -60,12 +60,12 @@ class CachedEventsCatalog implements EventsCatalog {
       final live = await remote.listVisible();
       await cache.save(live);
       return live;
-    } catch (error) {
+    } catch (_) {
       final cached = await cache.read();
       if (cached.isNotEmpty) {
         return cached;
       }
-      throw error;
+      rethrow;
     }
   }
 }
