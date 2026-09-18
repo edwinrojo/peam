@@ -39,6 +39,13 @@ class NotificationPayload {
     });
   }
 
+  static NotificationPayload? fromRemoteData(Map<String, dynamic> data) {
+    if (data.isEmpty) {
+      return null;
+    }
+    return tryParse(jsonEncode(data));
+  }
+
   static NotificationPayload? tryParse(String? raw) {
     if (raw == null || raw.trim().isEmpty) {
       return null;

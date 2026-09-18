@@ -1,8 +1,12 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:workmanager/workmanager.dart';
 
 import 'app.dart';
+import 'firebase_options.dart';
 import 'services/attendance_stores.dart';
 import 'services/auth_session_store.dart';
 import 'services/background_attendance_sync.dart';
@@ -10,6 +14,7 @@ import 'services/biometric_auth_service.dart';
 import 'services/connectivity_controller.dart';
 import 'services/employee_auth_api.dart';
 import 'services/events_catalog.dart';
+import 'services/fcm_push_service.dart';
 import 'services/live_notification_source.dart';
 import 'services/location_service.dart';
 import 'services/notification_inbox.dart';
@@ -28,6 +33,7 @@ void callbackDispatcher() {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await _initializeFirebase();
   await BackgroundAttendanceSync.initialize(callbackDispatcher);
 
   final pushNotifications = PushNotificationService();
@@ -77,6 +83,7 @@ Future<void> main() async {
       locationService: const DeviceLocationService(),
       session: SessionController(
         pushNotifications: pushNotifications,
+        fcmPush: FcmPushService(),
         localStore: localStore,
         remoteStore: remoteStore,
         connectivity: connectivity,
@@ -90,4 +97,16 @@ Future<void> main() async {
       ),
     ),
   );
+}
+
+Future<void> _initializeFirebase() async {
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+    return;
+  }
+  try {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.android);
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  } catch (error) {
+    debugPrint('PEAM Firebase init skipped: $error');
+  }
 }

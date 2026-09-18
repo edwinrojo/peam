@@ -132,6 +132,10 @@ class PushNotificationService {
     return value;
   }
 
+  void deliverTap(String payload) {
+    _deliver(payload);
+  }
+
   void _deliver(String? payload) {
     if (payload == null || payload.isEmpty) {
       return;

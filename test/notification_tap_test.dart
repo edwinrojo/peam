@@ -64,4 +64,17 @@ void main() {
     expect(restored.copyWith(isRead: true).eventId, 'evt-assembly');
     expect(restored.tapPayload.kind, NotificationKind.eventPublished);
   });
+
+  test('FCM data maps to a tap payload', () {
+    final parsed = NotificationPayload.fromRemoteData(<String, dynamic>{
+      'kind': 'eventPublished',
+      'event_id': 'evt-assembly',
+      'notification_id': 'event-published-evt-assembly',
+    });
+
+    expect(parsed, isNotNull);
+    expect(parsed!.kind, NotificationKind.eventPublished);
+    expect(parsed.eventId, 'evt-assembly');
+    expect(parsed.notificationId, 'event-published-evt-assembly');
+  });
 }

@@ -33,19 +33,23 @@ Then fill in the same values peam-web uses (`VITE_SUPABASE_URL` and `VITE_SUPABA
 
 The three files under `supabase/functions/` are **Edge Functions**. They run on Supabase, not in the Flutter app. Deploy them once per project; the app only *calls* them.
 
-| Function | When the app calls it | What it does |
+| Function | When it runs | What it does |
 | --- | --- | --- |
 | `request-login-otp` | Employee ID submitted | Looks up the HR email, sends a 6-digit code, returns a masked address |
 | `verify-login-otp` | Code submitted | Checks the code, starts a session, binds this phone (or returns a device-change ticket) |
 | `submit-device-change` | “Request new phone” | Files a `device_change_requests` row for HR |
+| `send-push` | HR publishes/updates an event or reviews a device-change | Sends FCM to bound Android phones |
 
-Those functions read `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` from the **Supabase project environment**. You do not put those in the mobile `.env`. After `supabase link`, deploy with:
+Those functions read `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and `FIREBASE_SERVICE_ACCOUNT` from the **Supabase project environment**. You do not put those in the mobile `.env`. After `supabase link`, deploy with:
 
 ```bash
 supabase functions deploy request-login-otp
 supabase functions deploy verify-login-otp
 supabase functions deploy submit-device-change
+supabase functions deploy send-push
 ```
+
+On an existing database, also run `docs/alter_fcm_token.sql` so `devices.fcm_token` exists. Android FCM is configured; iOS is not yet.
 
 Also run `docs/schema.sql` (includes `bind_employee_device`). Free-tier projects cannot edit Auth email templates until **custom SMTP** is on. Enable it under Authentication → Email → SMTP Settings, then change the **Magic Link** template so employees get a 6-digit code, not a “Sign in” link:
 

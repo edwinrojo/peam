@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
@@ -203,6 +204,21 @@ class EmployeeAuthApi {
 
   Future<void> signOut() async {
     await _client.auth.signOut();
+  }
+
+  Future<void> registerFcmToken(String token) async {
+    final trimmed = token.trim();
+    if (trimmed.isEmpty || _client.auth.currentSession == null) {
+      return;
+    }
+    try {
+      await _client.rpc(
+        'register_device_fcm_token',
+        params: {'p_fcm_token': trimmed},
+      );
+    } catch (error) {
+      debugPrint('PEAM FCM token save failed: $error');
+    }
   }
 
   Map<String, dynamic> _map(Object? data) {

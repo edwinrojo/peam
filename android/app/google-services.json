@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1092448432341",
+    "project_id": "peam-c985d",
+    "storage_bucket": "peam-c985d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1092448432341:android:34ddd6862300b9ef0f725c",
+        "android_client_info": {
+          "package_name": "com.example.peam"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCtt-e6NcT1mwXIeZkIyXwVIwhWvvyIHDg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

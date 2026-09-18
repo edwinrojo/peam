@@ -15,6 +15,7 @@ import '../services/connectivity_controller.dart';
 import '../services/email_mask.dart';
 import '../services/employee_auth_api.dart';
 import '../services/events_catalog.dart';
+import '../services/fcm_push_service.dart';
 import '../services/geofence.dart';
 import '../services/live_notification_source.dart';
 import '../services/notification_feed.dart';
@@ -44,6 +45,7 @@ class SessionController extends ChangeNotifier {
     EmployeeAuthApi? liveAuth,
     EventsCatalog? eventsCatalog,
     NotificationInbox? notificationInbox,
+    FcmPushService? fcmPush,
     GlobalKey<NavigatorState>? navigatorKey,
     this._liveNotifications,
     this._prototypeEmailCode = SampleData.prototypeEmailCode,
@@ -60,7 +62,8 @@ class SessionController extends ChangeNotifier {
        _ownsConnectivity = connectivity == null,
        _sync = syncService,
        _authStore = authStore ?? MemoryAuthSessionStore(),
-       _inbox = notificationInbox ?? MemoryNotificationInbox() {
+       _inbox = notificationInbox ?? MemoryNotificationInbox(),
+       _fcm = fcmPush {
     _accounts = [SampleData.demoEmployee];
     _notifications = const [];
     _connectivity.addListener(_onConnectivityChanged);
@@ -75,6 +78,7 @@ class SessionController extends ChangeNotifier {
   final EmployeeAuthApi? _remoteAuth;
   final EventsCatalog? _eventsCatalog;
   final NotificationInbox _inbox;
+  final FcmPushService? _fcm;
   final LiveNotificationSource? _liveNotifications;
   final String _prototypeEmailCode;
   final bool _ownsConnectivity;
@@ -241,6 +245,7 @@ class SessionController extends ChangeNotifier {
       await _syncWhenOnline();
       await _scheduleBackgroundSyncIfNeeded();
       await _startLiveNotices();
+      await _startFcm();
       return;
     }
     final session = await _authStore.readSession();
@@ -392,6 +397,7 @@ class SessionController extends ChangeNotifier {
     await _syncWhenOnline();
     await _scheduleBackgroundSyncIfNeeded();
     await _startLiveNotices();
+    await _startFcm();
     return null;
   }
 
@@ -461,6 +467,7 @@ class SessionController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    await _fcm?.stop();
     await _liveNotifications?.stop();
     await _persistInbox();
     await _remoteAuth?.signOut();
@@ -894,6 +901,23 @@ class SessionController extends ChangeNotifier {
     await _ingestDeviceRequests();
   }
 
+  Future<void> _startFcm() async {
+    final fcm = _fcm;
+    final auth = _remoteAuth;
+    if (fcm == null || auth == null || employee == null || _disposed) {
+      return;
+    }
+    await fcm.start(
+      onToken: auth.registerFcmToken,
+      onOpened: _push.deliverTap,
+      onForeground: (title, body, payload) {
+        unawaited(
+          _push.showBanner(title: title, body: body, payload: payload),
+        );
+      },
+    );
+  }
+
   Future<void> _ingestEventNotices() async {
     if (employee == null || _disposed) {
       return;
@@ -1024,6 +1048,7 @@ class SessionController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     onHomeBack = null;
+    unawaited(_fcm?.stop());
     unawaited(_liveNotifications?.stop());
     _connectivity.removeListener(_onConnectivityChanged);
     if (_ownsConnectivity) {

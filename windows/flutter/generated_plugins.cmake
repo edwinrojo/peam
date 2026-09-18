@@ -5,6 +5,7 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   connectivity_plus
+  firebase_core
   flutter_timezone
   geolocator_windows
   local_auth_windows
