@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:workmanager/workmanager.dart';
 
 import 'app.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
 import 'services/attendance_stores.dart';
 import 'services/auth_session_store.dart';
+import 'services/background_attendance_sync.dart';
 import 'services/biometric_auth_service.dart';
 import 'services/connectivity_controller.dart';
 import 'services/employee_auth_api.dart';
@@ -18,8 +19,16 @@ import 'services/supabase_attendance_store.dart';
 import 'services/supabase_config.dart';
 import 'state/session_controller.dart';
 
+@pragma('vm:entry-point')
+void callbackDispatcher() {
+  Workmanager().executeTask((task, inputData) async {
+    return runBackgroundAttendanceSync();
+  });
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await BackgroundAttendanceSync.initialize(callbackDispatcher);
 
   final pushNotifications = PushNotificationService();
   await pushNotifications.init();

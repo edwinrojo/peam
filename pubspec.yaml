@@ -49,6 +49,7 @@ dependencies:
   google_maps_flutter: ^2.14.0
   timezone: ^0.11.1
   flutter_timezone: ^5.1.0
+  workmanager: ^0.10.10
 
 dev_dependencies:
   flutter_test:

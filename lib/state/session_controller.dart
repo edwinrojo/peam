@@ -8,6 +8,7 @@ import '../models/models.dart';
 import '../services/attendance_stores.dart';
 import '../services/attendance_sync_service.dart';
 import '../services/auth_session_store.dart';
+import '../services/background_attendance_sync.dart';
 import '../services/client_ids.dart';
 import '../services/connectivity_controller.dart';
 import '../services/email_mask.dart';
@@ -197,6 +198,7 @@ class SessionController extends ChangeNotifier {
       await _reloadHistory();
       await refreshEvents();
       await _syncWhenOnline();
+      await _scheduleBackgroundSyncIfNeeded();
       await _startLiveNotices();
       return;
     }
@@ -219,6 +221,7 @@ class SessionController extends ChangeNotifier {
     await _reloadHistory();
     await refreshEvents();
     await _syncWhenOnline();
+    await _scheduleBackgroundSyncIfNeeded();
   }
 
   Future<void> _applyStoredBindings() async {
@@ -346,6 +349,7 @@ class SessionController extends ChangeNotifier {
     await _reloadHistory();
     await refreshEvents();
     await _syncWhenOnline();
+    await _scheduleBackgroundSyncIfNeeded();
     await _startLiveNotices();
     return null;
   }
@@ -419,6 +423,7 @@ class SessionController extends ChangeNotifier {
     await _liveNotifications?.stop();
     await _persistInbox();
     await _remoteAuth?.signOut();
+    await BackgroundAttendanceSync.cancel();
     await _authStore.clearSession();
     employee = null;
     pendingChallenge = null;
@@ -597,6 +602,7 @@ class SessionController extends ChangeNotifier {
     } catch (error) {
       debugPrint('PEAM attendance upload failed: $error');
     }
+    await _scheduleBackgroundSyncIfNeeded();
     await _reloadHistory();
   }
 
@@ -668,6 +674,7 @@ class SessionController extends ChangeNotifier {
     } catch (error) {
       debugPrint('PEAM check-out upload failed: $error');
     }
+    await _scheduleBackgroundSyncIfNeeded();
     await _reloadHistory();
   }
 
@@ -719,6 +726,7 @@ class SessionController extends ChangeNotifier {
     } finally {
       isSyncing = false;
       _notify();
+      unawaited(_scheduleBackgroundSyncIfNeeded());
     }
   }
 
@@ -727,6 +735,17 @@ class SessionController extends ChangeNotifier {
       return;
     }
     await syncPending();
+  }
+
+  Future<void> _scheduleBackgroundSyncIfNeeded() async {
+    if (_disposed || employee == null) {
+      return;
+    }
+    final hasPending = _history.any((record) => record.isPending);
+    if (!hasPending) {
+      return;
+    }
+    await BackgroundAttendanceSync.schedulePendingUpload();
   }
 
   Future<void> _mergeRemoteHistory() async {

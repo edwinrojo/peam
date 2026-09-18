@@ -151,7 +151,7 @@ class _SyncStatusCard extends StatelessWidget {
       return 'Sending saved check-ins to PEAM.';
     }
     if (!online) {
-      return 'No network on this phone. New check-ins stay here and upload when connectivity returns.';
+      return 'No network on this phone. New check-ins stay here and upload when connectivity returns, even if PEAM is closed.';
     }
     if (pending > 0) {
       return pending == 1
