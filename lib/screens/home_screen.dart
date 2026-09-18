@@ -578,7 +578,7 @@ class _OfflineSyncBanner extends StatelessWidget {
                         ? 'Online · local attendance is synced'
                         : 'Offline · new check-ins stay on this device')
                   : (online
-                        ? '$pending pending · open History to sync'
+                        ? '$pending pending · uploading automatically'
                         : '$pending pending · saved offline until connectivity returns'),
               style: const TextStyle(
                 fontWeight: FontWeight.w600,

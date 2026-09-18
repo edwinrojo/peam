@@ -1,7 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../data/sample_data.dart';
-import '../data/sample_notifications.dart';
 import '../models/app_notification.dart';
 import '../models/models.dart';
 import '../services/attendance_stores.dart';
@@ -13,6 +14,9 @@ import '../services/email_mask.dart';
 import '../services/employee_auth_api.dart';
 import '../services/events_catalog.dart';
 import '../services/geofence.dart';
+import '../services/live_notification_source.dart';
+import '../services/notification_feed.dart';
+import '../services/notification_inbox.dart';
 import '../services/push_notification_service.dart';
 
 export 'session_scope.dart';
@@ -37,6 +41,8 @@ class SessionController extends ChangeNotifier {
     AuthSessionStore? authStore,
     EmployeeAuthApi? liveAuth,
     EventsCatalog? eventsCatalog,
+    NotificationInbox? notificationInbox,
+    this._liveNotifications,
     this._prototypeEmailCode = SampleData.prototypeEmailCode,
   }) : _remoteAuth = liveAuth,
        _eventsCatalog = eventsCatalog,
@@ -49,9 +55,10 @@ class SessionController extends ChangeNotifier {
        _connectivity = connectivity ?? ConnectivityController(),
        _ownsConnectivity = connectivity == null,
        _sync = syncService,
-       _authStore = authStore ?? MemoryAuthSessionStore() {
+       _authStore = authStore ?? MemoryAuthSessionStore(),
+       _inbox = notificationInbox ?? MemoryNotificationInbox() {
     _accounts = [SampleData.demoEmployee];
-    _notifications = List.of(SampleNotifications.seed);
+    _notifications = const [];
     _connectivity.addListener(_onConnectivityChanged);
   }
 
@@ -63,6 +70,8 @@ class SessionController extends ChangeNotifier {
   final AuthSessionStore _authStore;
   final EmployeeAuthApi? _remoteAuth;
   final EventsCatalog? _eventsCatalog;
+  final NotificationInbox _inbox;
+  final LiveNotificationSource? _liveNotifications;
   final String _prototypeEmailCode;
   final bool _ownsConnectivity;
 
@@ -77,6 +86,7 @@ class SessionController extends ChangeNotifier {
   AttendanceRecord? lastAttendance;
   List<AttendanceRecord> _history = const [];
   late List<AppNotification> _notifications;
+  NotificationSnapshot _noticeSnapshot = const NotificationSnapshot();
   String searchQuery = '';
   EventStatus? statusFilter;
   int remoteRecordCount = 0;
@@ -84,6 +94,8 @@ class SessionController extends ChangeNotifier {
   bool isLoadingEvents = false;
   String? eventsError;
   GeofenceCheck? stagedGeofence;
+  bool _disposed = false;
+  Future<int>? _syncInFlight;
 
   List<Employee> get accounts => List.unmodifiable(_accounts);
   List<AttendanceRecord> get history => List.unmodifiable(_history);
@@ -180,8 +192,11 @@ class SessionController extends ChangeNotifier {
         employeeNumber: restored.employeeNumber,
         deviceUid: deviceUid,
       );
+      await _loadInbox();
       await _reloadHistory();
       await refreshEvents();
+      await _syncWhenOnline();
+      await _startLiveNotices();
       return;
     }
     final session = await _authStore.readSession();
@@ -199,8 +214,10 @@ class SessionController extends ChangeNotifier {
       return;
     }
     employee = account.copyWith(deviceUid: deviceUid);
+    await _loadInbox();
     await _reloadHistory();
     await refreshEvents();
+    await _syncWhenOnline();
   }
 
   Future<void> _applyStoredBindings() async {
@@ -324,8 +341,11 @@ class SessionController extends ChangeNotifier {
       employeeNumber: bound.employeeNumber,
       deviceUid: deviceUid,
     );
+    await _loadInbox();
     await _reloadHistory();
     await refreshEvents();
+    await _syncWhenOnline();
+    await _startLiveNotices();
     return null;
   }
 
@@ -395,6 +415,8 @@ class SessionController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    await _liveNotifications?.stop();
+    await _persistInbox();
     await _remoteAuth?.signOut();
     await _authStore.clearSession();
     employee = null;
@@ -404,6 +426,8 @@ class SessionController extends ChangeNotifier {
     selectedEvent = null;
     lastAttendance = null;
     _history = const [];
+    _notifications = const [];
+    _noticeSnapshot = const NotificationSnapshot();
     remoteRecordCount = 0;
     searchQuery = '';
     statusFilter = null;
@@ -434,23 +458,29 @@ class SessionController extends ChangeNotifier {
       eventsError = null;
       isLoadingEvents = false;
       notifyListeners();
+      await _ingestEventNotices();
       return;
     }
 
     isLoadingEvents = true;
     notifyListeners();
+    var ingest = true;
     try {
       _events = await catalog.listVisible();
       eventsError = null;
     } catch (_) {
       if (_events.isEmpty) {
         eventsError = 'Could not load events. Pull down to try again.';
+        ingest = false;
       } else {
         eventsError = 'Could not refresh events. Showing the last list.';
       }
     } finally {
       isLoadingEvents = false;
       notifyListeners();
+    }
+    if (ingest) {
+      await _ingestEventNotices();
     }
   }
 
@@ -480,6 +510,13 @@ class SessionController extends ChangeNotifier {
   Future<int> simulateOnlineAndSync() async {
     _connectivity.simulateOnline();
     return syncPending();
+  }
+
+  Future<void> refreshAttendance() async {
+    if (_connectivity.isOnline) {
+      await syncPending();
+    }
+    await _reloadHistory();
   }
 
   Future<void> confirmAttendance({required DateTime checkInAt}) async {
@@ -524,49 +561,78 @@ class SessionController extends ChangeNotifier {
       syncStatus: SyncStatus.pending,
       clientRecordedAt: checkInAt,
     );
-    await _local.upsert(record);
+    try {
+      await _local.upsert(record);
+    } catch (error) {
+      debugPrint('PEAM local attendance save failed: $error');
+      return;
+    }
     lastAttendance = record;
     stagedGeofence = null;
-    await _reloadHistory();
+    _history = [
+      record,
+      for (final item in _history)
+        if (item.event.id != record.event.id) item,
+    ];
+    _notify();
     await addNotification(
       title: recordedOffline
           ? 'Attendance recorded offline'
           : 'Attendance saved on device',
       body: recordedOffline
           ? 'Your check-in for ${event.name} is saved on this device and will sync when connectivity returns.'
-          : 'Your check-in for ${event.name} is stored locally and will upload to Supabase.',
+          : 'Your check-in for ${event.name} is saved on this phone and will upload to PEAM.',
       kind: NotificationKind.attendanceSync,
       showSystemBanner: true,
     );
-    if (_connectivity.isOnline) {
-      await syncPending();
+    try {
+      await _syncWhenOnline();
+    } catch (error) {
+      debugPrint('PEAM attendance upload failed: $error');
     }
+    await _reloadHistory();
   }
 
-  Future<int> syncPending() async {
+  Future<int> syncPending() {
+    final existing = _syncInFlight;
+    if (existing != null) {
+      return existing;
+    }
+    late final Future<int> pending;
+    pending = _performSync().whenComplete(() {
+      if (identical(_syncInFlight, pending)) {
+        _syncInFlight = null;
+      }
+    });
+    _syncInFlight = pending;
+    return pending;
+  }
+
+  Future<int> _performSync() async {
     final currentEmployee = employee;
-    if (currentEmployee == null || !_connectivity.isOnline || isSyncing) {
+    if (currentEmployee == null || !_connectivity.isOnline || _disposed) {
       return 0;
     }
 
     isSyncing = true;
-    notifyListeners();
+    _notify();
     try {
       final uploaded = await _sync.syncPending(
         local: _local,
         remote: _remote,
         employee: currentEmployee,
       );
+      await _mergeRemoteHistory();
       await _reloadHistory();
       if (lastAttendance != null) {
         lastAttendance = recordFor(lastAttendance!.event.id) ?? lastAttendance;
       }
-      if (uploaded > 0) {
+      if (uploaded > 0 && !_disposed) {
         await addNotification(
           title: 'Attendance synced',
           body: uploaded == 1
-              ? '1 pending attendance record was uploaded to Supabase.'
-              : '$uploaded pending attendance records were uploaded to Supabase.',
+              ? '1 pending attendance record was uploaded to PEAM.'
+              : '$uploaded pending attendance records were uploaded to PEAM.',
           kind: NotificationKind.attendanceSync,
           showSystemBanner: true,
         );
@@ -574,8 +640,34 @@ class SessionController extends ChangeNotifier {
       return uploaded;
     } finally {
       isSyncing = false;
-      notifyListeners();
+      _notify();
     }
+  }
+
+  Future<void> _syncWhenOnline() async {
+    if (!_connectivity.isOnline || employee == null || _disposed) {
+      return;
+    }
+    await syncPending();
+  }
+
+  Future<void> _mergeRemoteHistory() async {
+    final currentEmployee = employee;
+    if (currentEmployee == null || !_connectivity.isOnline) {
+      return;
+    }
+    try {
+      final remoteRows = await _remote.listForEmployee(currentEmployee);
+      for (final row in remoteRows) {
+        await _local.upsert(
+          row.copyWith(
+            serverId: row.serverId ?? row.clientRecordId,
+            syncStatus: SyncStatus.synced,
+            syncedAt: row.syncedAt ?? DateTime.now().toUtc(),
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   void markNotificationRead(String id) {
@@ -583,6 +675,7 @@ class SessionController extends ChangeNotifier {
       for (final item in _notifications)
         if (item.id == id) item.copyWith(isRead: true) else item,
     ];
+    unawaited(_persistInbox());
     notifyListeners();
   }
 
@@ -590,43 +683,13 @@ class SessionController extends ChangeNotifier {
     _notifications = [
       for (final item in _notifications) item.copyWith(isRead: true),
     ];
+    unawaited(_persistInbox());
     notifyListeners();
   }
 
-  Future<void> simulateIncomingPush({
-    NotificationKind kind = NotificationKind.eventPublished,
-  }) async {
-    final payload = switch (kind) {
-      NotificationKind.eventPublished => (
-        title: 'New event published',
-        body:
-            'Disaster Preparedness Training is now published for September 12 at Magsaysay Covered Court.',
-      ),
-      NotificationKind.eventReminder => (
-        title: 'Event reminder',
-        body:
-            'Midyear Financial Briefing starts in 30 minutes at the PGO Conference Hall.',
-      ),
-      NotificationKind.deviceChangeUpdate => (
-        title: 'Device-change request update',
-        body: 'HR reviewed your device-change request. Open PEAM for details.',
-      ),
-      NotificationKind.attendanceSync => (
-        title: 'Attendance synced',
-        body: 'Pending offline attendance records were uploaded to Supabase.',
-      ),
-      NotificationKind.adminNotice => (
-        title: 'PEAM notice',
-        body: 'Please keep your registered device nearby for event check-in.',
-      ),
-    };
-
-    await addNotification(
-      title: payload.title,
-      body: payload.body,
-      kind: kind,
-      showSystemBanner: true,
-    );
+  Future<void> refreshNotifications() async {
+    await refreshEvents();
+    await _ingestDeviceRequests();
   }
 
   Future<void> addNotification({
@@ -642,12 +705,121 @@ class SessionController extends ChangeNotifier {
       kind: kind,
       createdAt: DateTime.now(),
     );
-    _notifications = [item, ..._notifications];
-    notifyListeners();
+    await _prependNotices([item], showBanner: showSystemBanner);
+  }
 
-    if (showSystemBanner) {
-      await _push.showBanner(title: title, body: body);
+  Future<void> _loadInbox() async {
+    final current = employee;
+    if (current == null) {
+      _notifications = const [];
+      _noticeSnapshot = const NotificationSnapshot();
+      return;
     }
+    _noticeSnapshot = await _inbox.load(current.employeeNumber);
+    _notifications = List.of(_noticeSnapshot.items);
+    _notify();
+  }
+
+  Future<void> _persistInbox() async {
+    final current = employee;
+    if (current == null) {
+      return;
+    }
+    _noticeSnapshot = _noticeSnapshot.copyWith(items: _notifications);
+    await _inbox.save(current.employeeNumber, _noticeSnapshot);
+  }
+
+  Future<void> _startLiveNotices() async {
+    final live = _liveNotifications;
+    if (live == null || employee == null) {
+      return;
+    }
+    await live.start(
+      onEventsChanged: () {
+        if (!_disposed) {
+          unawaited(refreshEvents());
+        }
+      },
+      onDeviceRequestsChanged: () {
+        if (!_disposed) {
+          unawaited(_ingestDeviceRequests());
+        }
+      },
+    );
+    await _ingestDeviceRequests();
+  }
+
+  Future<void> _ingestEventNotices() async {
+    if (employee == null || _disposed) {
+      return;
+    }
+    final result = reconcileEventNotices(
+      previousFingerprints: _noticeSnapshot.eventFingerprints,
+      remindedEventIds: _noticeSnapshot.remindedEventIds,
+      events: _events,
+    );
+    _noticeSnapshot = _noticeSnapshot.copyWith(
+      eventFingerprints: result.fingerprints,
+      remindedEventIds: result.remindedEventIds,
+    );
+    for (final reminder in result.remindersToSchedule) {
+      final notice = reminderNoticeFor(reminder.event, reminder.when);
+      await _push.scheduleBanner(
+        id: _reminderId(reminder.event.id),
+        title: notice.title,
+        body: notice.body,
+        when: reminder.when,
+      );
+    }
+    await _prependNotices(result.notices);
+    await _persistInbox();
+  }
+
+  Future<void> _ingestDeviceRequests() async {
+    final live = _liveNotifications;
+    if (live == null || employee == null || _disposed) {
+      return;
+    }
+    final rows = await live.listDeviceRequests();
+    final result = reconcileDeviceRequests(
+      previousStatuses: _noticeSnapshot.deviceRequestStatuses,
+      rows: rows,
+    );
+    _noticeSnapshot = _noticeSnapshot.copyWith(
+      deviceRequestStatuses: result.statuses,
+    );
+    await _prependNotices(result.notices);
+    await _persistInbox();
+  }
+
+  Future<void> _prependNotices(
+    List<AppNotification> notices, {
+    bool showBanner = true,
+  }) async {
+    if (notices.isEmpty || _disposed) {
+      return;
+    }
+    final existing = {for (final item in _notifications) item.id};
+    final fresh = [
+      for (final item in notices)
+        if (!existing.contains(item.id)) item,
+    ];
+    if (fresh.isEmpty) {
+      return;
+    }
+    _notifications = [...fresh, ..._notifications];
+    await _persistInbox();
+    _notify();
+    if (!showBanner) {
+      return;
+    }
+    for (final item in fresh) {
+      await _push.showBanner(title: item.title, body: item.body);
+    }
+  }
+
+  int _reminderId(String eventId) {
+    return 500000 + (eventId.hashCode.abs() % 400000);
   }
 
   Future<void> _reloadHistory() async {
@@ -655,20 +827,53 @@ class SessionController extends ChangeNotifier {
     if (currentEmployee == null) {
       _history = const [];
       remoteRecordCount = 0;
-      notifyListeners();
+      _notify();
       return;
     }
     _history = await _local.listForEmployee(currentEmployee);
-    remoteRecordCount = (await _remote.listForEmployee(currentEmployee)).length;
-    notifyListeners();
+    _notify();
+    if (!_connectivity.isOnline) {
+      remoteRecordCount = _history
+          .where((record) => record.syncStatus == SyncStatus.synced)
+          .length;
+      return;
+    }
+    try {
+      remoteRecordCount =
+          (await _remote
+                  .listForEmployee(currentEmployee)
+                  .timeout(const Duration(seconds: 12)))
+              .length;
+    } catch (error) {
+      debugPrint('PEAM attendance history fetch failed: $error');
+      remoteRecordCount = _history
+          .where((record) => record.syncStatus == SyncStatus.synced)
+          .length;
+    }
+    _notify();
   }
 
   void _onConnectivityChanged() {
-    notifyListeners();
+    if (_disposed) {
+      return;
+    }
+    _notify();
+    if (_connectivity.isOnline && employee != null) {
+      unawaited(_syncWhenOnline());
+      unawaited(refreshNotifications());
+    }
+  }
+
+  void _notify() {
+    if (!_disposed) {
+      notifyListeners();
+    }
   }
 
   @override
   void dispose() {
+    _disposed = true;
+    unawaited(_liveNotifications?.stop());
     _connectivity.removeListener(_onConnectivityChanged);
     if (_ownsConnectivity) {
       _connectivity.dispose();

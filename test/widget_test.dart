@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:peam/app.dart';
 import 'package:peam/data/sample_data.dart';
+import 'package:peam/services/attendance_stores.dart';
 import 'package:peam/services/auth_session_store.dart';
 import 'package:peam/services/biometric_auth_service.dart';
+import 'package:peam/services/connectivity_controller.dart';
 import 'package:peam/services/location_service.dart';
+import 'package:peam/services/push_notification_service.dart';
 import 'package:peam/state/session_controller.dart';
 
 void main() {
@@ -195,7 +198,17 @@ void main() {
   testWidgets('offline check-in is stored locally and syncs when online', (
     tester,
   ) async {
-    await _openApp(tester);
+    final connectivity = ConnectivityController();
+    final session = SessionController(
+      localStore: MemoryAttendanceLocalStore.withDemoSeed(),
+      remoteStore: MemoryAttendanceRemoteStore(),
+      connectivity: connectivity,
+      pushNotifications: PushNotificationService(enableSystemBanners: false),
+    );
+    addTearDown(session.dispose);
+
+    await tester.pumpWidget(PeamApp(session: session));
+    await tester.pumpAndSettle();
     await _loginAsDemo(tester);
 
     expect(
@@ -225,14 +238,16 @@ void main() {
     expect(find.text('Midyear Financial Briefing'), findsOneWidget);
     expect(find.byKey(const Key('sync-chip-evt-assembly')), findsOneWidget);
     expect(find.text('Pending'), findsOneWidget);
-    expect(find.byKey(const Key('simulate-online-button')), findsOneWidget);
+    expect(find.text('Simulate connectivity'), findsNothing);
+    expect(find.text('Simulate offline'), findsNothing);
+    expect(find.byKey(const Key('simulate-online-button')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('simulate-online-button')));
+    connectivity.simulateOnline();
+    await session.syncPending();
     await tester.pumpAndSettle();
 
     expect(find.text('Pending'), findsNothing);
     expect(find.text('Synced'), findsWidgets);
-    expect(find.textContaining('uploaded to mock Supabase'), findsOneWidget);
   });
 
   testWidgets('home search and history navigation work', (tester) async {
@@ -276,9 +291,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Midyear Financial Briefing'), findsOneWidget);
+    expect(find.text('Simulate connectivity'), findsNothing);
+    expect(find.text('Simulate offline'), findsNothing);
+    expect(find.textContaining('simulate a drop'), findsNothing);
   });
 
-  testWidgets('notifications prototype opens and can simulate a push', (
+  testWidgets('notifications list real notices and has no simulate control', (
     tester,
   ) async {
     await _openApp(tester);
@@ -288,16 +306,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Notifications'), findsWidgets);
-    expect(find.text('New event published'), findsOneWidget);
-    expect(find.byKey(const Key('simulate-push-button')), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('simulate-push-button')));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.textContaining('Disaster Preparedness Training'),
-      findsOneWidget,
-    );
+    expect(find.text('No notifications yet'), findsOneWidget);
+    expect(find.byKey(const Key('simulate-push-button')), findsNothing);
+    expect(find.text('Simulate push'), findsNothing);
   });
 }
 

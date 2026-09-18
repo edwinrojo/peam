@@ -137,14 +137,17 @@ class FileEventsCache implements EventsCache {
   }
 }
 
-ProvincialEvent? provincialEventFromRow(Map<String, dynamic> row) {
+ProvincialEvent? provincialEventFromRow(
+  Map<String, dynamic> row, {
+  bool includeHidden = false,
+}) {
   final id = row['id']?.toString();
-  final name = row['name'] as String?;
-  final venue = row['venue'] as String?;
-  if (id == null || id.isEmpty || name == null || name.trim().isEmpty) {
+  final name = row['name']?.toString().trim();
+  final venue = row['venue']?.toString().trim();
+  if (id == null || id.isEmpty || name == null || name.isEmpty) {
     return null;
   }
-  if (venue == null || venue.trim().isEmpty) {
+  if (venue == null || venue.isEmpty) {
     return null;
   }
   final eventDate = parseEventDate(row['event_date']);
@@ -154,7 +157,8 @@ ProvincialEvent? provincialEventFromRow(Map<String, dynamic> row) {
     return null;
   }
   final status = parseEventStatus(row['status']);
-  if (status == EventStatus.draft || status == EventStatus.cancelled) {
+  if (!includeHidden &&
+      (status == EventStatus.draft || status == EventStatus.cancelled)) {
     return null;
   }
   final radius = _asInt(row['geofence_radius_meters']) ?? 100;

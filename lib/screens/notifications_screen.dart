@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../models/app_notification.dart';
 import '../state/session_controller.dart';
 import '../theme/app_theme.dart';
-import '../widgets/primary_button.dart';
 import '../widgets/soft_card.dart';
 
 class NotificationsScreen extends StatelessWidget {
@@ -34,68 +33,66 @@ class NotificationsScreen extends StatelessWidget {
                 ),
             ],
           ),
-          body: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                child: SoftCard(
-                  color: AppColors.lavender,
-                  padding: const EdgeInsets.all(14),
-                  child: const Text(
-                    'Prototype mode: these simulate FCM push alerts from Supabase (event published, reminders, device-change updates). Tap “Simulate push” to fire an in-app item and a system banner.',
-                    style: TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 13,
-                      height: 1.4,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: items.isEmpty
-                    ? const Center(child: Text('No notifications yet.'))
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                        itemCount: items.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final item = items[index];
-                          return _NotificationTile(
-                            notification: item,
-                            onTap: () => session.markNotificationRead(item.id),
-                          );
-                        },
-                      ),
-              ),
-              SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                  child: PrimaryButton(
-                    key: const Key('simulate-push-button'),
-                    label: 'Simulate push',
-                    icon: Icons.notifications_active_outlined,
-                    onPressed: () async {
-                      await session.simulateIncomingPush();
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Simulated push added. Check the notification shade if permission is allowed.',
-                            ),
-                          ),
-                        );
-                      }
+          body: RefreshIndicator(
+            onRefresh: session.refreshNotifications,
+            child: items.isEmpty
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+                    children: const [_EmptyNotifications()],
+                  )
+                : ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                    itemCount: items.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return _NotificationTile(
+                        notification: item,
+                        onTap: () => session.markNotificationRead(item.id),
+                      );
                     },
                   ),
-                ),
-              ),
-            ],
           ),
         );
       },
+    );
+  }
+}
+
+class _EmptyNotifications extends StatelessWidget {
+  const _EmptyNotifications();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SoftCard(
+      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+      child: Column(
+        children: [
+          Icon(
+            Icons.notifications_none_rounded,
+            size: 40,
+            color: AppColors.muted,
+          ),
+          SizedBox(height: 12),
+          Text(
+            'No notifications yet',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 16,
+              color: AppColors.ink,
+            ),
+          ),
+          SizedBox(height: 6),
+          Text(
+            'PEAM will notify you here when HR publishes or updates an event, when a reminder is due, and when a device-change request is reviewed.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.muted, height: 1.4),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -149,7 +146,7 @@ class _NotificationTile extends StatelessWidget {
                     Expanded(
                       child: Text(
                         notification.title,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
                           color: AppColors.ink,

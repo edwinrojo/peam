@@ -5,6 +5,7 @@ import 'package:peam/services/attendance_stores.dart';
 import 'package:peam/services/attendance_sync_service.dart';
 import 'package:peam/services/connectivity_controller.dart';
 import 'package:peam/services/push_notification_service.dart';
+import 'package:peam/services/sqlite_attendance_database.dart';
 import 'package:peam/state/session_controller.dart';
 
 void main() {
@@ -44,6 +45,62 @@ void main() {
     expect(rows, hasLength(1));
   });
 
+  test('local codec hydrates a live event snapshot without sample data', () {
+    final employee = SampleData.demoEmployee;
+    final event = ProvincialEvent(
+      id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+      name: 'Capitol Flag Ceremony',
+      description: 'Monday flag ceremony',
+      eventDate: DateTime(2026, 9, 21),
+      startTime: '8:00 AM',
+      endTime: '9:00 AM',
+      venue: 'Provincial Capitol Grounds, Digos City',
+      location: SampleData.capitol,
+      status: EventStatus.ongoing,
+    );
+    final record = AttendanceRecord(
+      clientRecordId: 'c0a80100-0000-4000-8000-00000000ae07',
+      event: event,
+      employee: employee,
+      checkInAt: DateTime(2026, 9, 21, 8, 5),
+      checkInLatitude: event.location.latitude,
+      checkInLongitude: event.location.longitude,
+      recordedOffline: true,
+      syncStatus: SyncStatus.pending,
+      clientRecordedAt: DateTime(2026, 9, 21, 8, 5),
+    );
+
+    final restored = AttendanceRowCodec.fromMap(
+      AttendanceRowCodec.toMap(record),
+      employee,
+    );
+
+    expect(restored, isNotNull);
+    expect(restored!.event.id, event.id);
+    expect(restored.event.name, 'Capitol Flag Ceremony');
+    expect(restored.recordedOffline, isTrue);
+  });
+
+  test('codec keeps a live attendance row even without an event snapshot', () {
+    final employee = SampleData.demoEmployee;
+    final restored = AttendanceRowCodec.fromMap({
+      'client_record_id': 'c0a80100-0000-4000-8000-00000000ae08',
+      'event_id': '7c9e6679-7425-40de-944b-e07fc1f90ae8',
+      'employee_number': employee.employeeNumber,
+      'check_in_at': '2026-09-18T08:05:00.000',
+      'geofence_verified': 1,
+      'biometric_verified': 1,
+      'verification_status': 'verified',
+      'attendance_status': 'incomplete',
+      'recorded_offline': 0,
+      'sync_status': 'pending',
+    }, employee);
+
+    expect(restored, isNotNull);
+    expect(restored!.event.id, '7c9e6679-7425-40de-944b-e07fc1f90ae8');
+    expect(restored.syncStatus, SyncStatus.pending);
+  });
+
   test('sync uploads pending local rows and marks them synced', () async {
     final local = MemoryAttendanceLocalStore();
     final remote = MemoryAttendanceRemoteStore();
@@ -66,6 +123,27 @@ void main() {
     expect(remoteRows, hasLength(1));
     expect(remoteRows.single.clientRecordId, 'client-offline');
   });
+
+  test(
+    'failed upload leaves the local row pending for a later retry',
+    () async {
+      final local = MemoryAttendanceLocalStore();
+      final employee = SampleData.demoEmployee;
+      await local.upsert(
+        checkInRecord(clientRecordId: 'client-retry', employee: employee),
+      );
+
+      final uploaded = await const AttendanceSyncService().syncPending(
+        local: local,
+        remote: _ThrowingRemoteStore(),
+        employee: employee,
+      );
+      final localRows = await local.listForEmployee(employee);
+
+      expect(uploaded, 0);
+      expect(localRows.single.syncStatus, SyncStatus.pending);
+    },
+  );
 
   test(
     'session keeps check-in pending offline then syncs when online',
@@ -99,6 +177,41 @@ void main() {
     },
   );
 
+  test(
+    'coming back online uploads pending attendance without tapping Sync',
+    () async {
+      final remote = MemoryAttendanceRemoteStore();
+      final connectivity = ConnectivityController();
+      final session = SessionController(
+        localStore: MemoryAttendanceLocalStore(),
+        remoteStore: remote,
+        connectivity: connectivity,
+        pushNotifications: PushNotificationService(enableSystemBanners: false),
+      );
+      addTearDown(session.dispose);
+
+      final error = await session.completePrototypeLogin(
+        SampleData.demoEmployee.employeeNumber,
+      );
+      expect(error, isNull);
+
+      session.selectEvent(SampleData.events.first);
+      await session.confirmAttendance(checkInAt: DateTime(2026, 8, 25, 8, 15));
+      expect(session.pendingCount, 1);
+      expect(await remote.listForEmployee(SampleData.demoEmployee), isEmpty);
+
+      connectivity.simulateOnline();
+      await _waitUntil(() => session.pendingCount == 0);
+
+      expect(session.pendingCount, 0);
+      expect(session.history.single.syncStatus, SyncStatus.synced);
+      expect(
+        await remote.listForEmployee(SampleData.demoEmployee),
+        hasLength(1),
+      );
+    },
+  );
+
   test('session rejects check-in after the event end time', () async {
     final session = SessionController(
       localStore: MemoryAttendanceLocalStore(),
@@ -125,4 +238,26 @@ void main() {
     );
     expect(session.lastAttendance?.event.id, isNot('evt-health'));
   });
+}
+
+Future<void> _waitUntil(bool Function() test) async {
+  for (var attempt = 0; attempt < 50; attempt++) {
+    if (test()) {
+      return;
+    }
+    await Future<void>.delayed(Duration.zero);
+  }
+  fail('Timed out waiting for auto-sync.');
+}
+
+class _ThrowingRemoteStore implements AttendanceRemoteStore {
+  @override
+  Future<AttendanceRecord> upsert(AttendanceRecord record) {
+    throw StateError('Supabase unreachable');
+  }
+
+  @override
+  Future<List<AttendanceRecord>> listForEmployee(Employee employee) async {
+    return const [];
+  }
 }

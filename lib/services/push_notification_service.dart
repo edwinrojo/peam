@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:timezone/data/latest.dart' as tzdata;
+import 'package:timezone/timezone.dart' as tz;
 
-/// Prototype stand-in for FCM push delivery using local system notifications.
-/// Real production delivery will use Firebase Cloud Messaging + Supabase.
+/// System banners and scheduled event reminders on this device.
 class PushNotificationService {
   PushNotificationService({this.enableSystemBanners = true});
 
@@ -21,6 +23,14 @@ class PushNotificationService {
     }
 
     try {
+      tzdata.initializeTimeZones();
+      try {
+        final info = await FlutterTimezone.getLocalTimezone();
+        tz.setLocalLocation(tz.getLocation(info.identifier));
+      } catch (_) {
+        tz.setLocalLocation(tz.UTC);
+      }
+
       const android = AndroidInitializationSettings('@mipmap/ic_launcher');
       const darwin = DarwinInitializationSettings(
         requestAlertPermission: true,
@@ -61,30 +71,57 @@ class PushNotificationService {
     if (!_ready) {
       return;
     }
-
-    const androidDetails = AndroidNotificationDetails(
-      'peam_attendance',
-      'PEAM Attendance',
-      channelDescription: 'Prototype push notifications for PEAM-Registry',
-      importance: Importance.high,
-      priority: Priority.high,
-    );
-    const darwinDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
-    const details = NotificationDetails(
-      android: androidDetails,
-      iOS: darwinDetails,
-      macOS: darwinDetails,
-    );
-
     await _plugin.show(
       id: _nextId++,
       title: title,
       body: body,
-      notificationDetails: details,
+      notificationDetails: _details,
     );
   }
+
+  Future<void> scheduleBanner({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime when,
+  }) async {
+    if (!_ready || !when.isAfter(DateTime.now())) {
+      return;
+    }
+    await _plugin.zonedSchedule(
+      id: id,
+      title: title,
+      body: body,
+      scheduledDate: tz.TZDateTime.from(when, tz.local),
+      notificationDetails: _details,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+    );
+  }
+
+  Future<void> cancel(int id) async {
+    if (!_ready) {
+      return;
+    }
+    await _plugin.cancel(id: id);
+  }
+
+  static const _details = NotificationDetails(
+    android: AndroidNotificationDetails(
+      'peam_attendance',
+      'PEAM Attendance',
+      channelDescription: 'Event, reminder, and attendance notices for PEAM.',
+      importance: Importance.high,
+      priority: Priority.high,
+    ),
+    iOS: DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    ),
+    macOS: DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    ),
+  );
 }

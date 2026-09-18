@@ -23,7 +23,7 @@ abstract class AttendanceLocalStore {
   });
 }
 
-/// Prototype stand-in for `public.attendance_records` in Supabase.
+/// Central `public.attendance_records` store (Supabase, or a prototype stand-in).
 abstract class AttendanceRemoteStore {
   Future<AttendanceRecord> upsert(AttendanceRecord record);
 

@@ -109,6 +109,12 @@ class EmployeeAuthApi {
       if (refreshToken != null && refreshToken.isNotEmpty) {
         await _client.auth.setSession(refreshToken);
       }
+      if (_client.auth.currentSession == null) {
+        return const RemoteVerifyResult(
+          error:
+              'Signed in, but this device could not keep the session. Try again.',
+        );
+      }
 
       final employeeJson = data['employee'];
       if (employeeJson is! Map) {
@@ -182,16 +188,16 @@ class EmployeeAuthApi {
     }
 
     return Employee(
-      employeeNumber: profile['employee_number'] as String? ?? '',
-      fullName: profile['full_name'] as String? ?? '',
-      email: profile['email'] as String?,
+      employeeNumber: _stringValue(profile['employee_number']),
+      fullName: _stringValue(profile['full_name']),
+      email: _nullableString(profile['email']),
       department: Department(
-        name: department?['name'] as String? ?? 'Unassigned',
-        code: department?['code'] as String? ?? '—',
+        name: _nullableString(department?['name']) ?? 'Unassigned',
+        code: _nullableString(department?['code']) ?? '—',
       ),
-      phone: profile['phone'] as String?,
+      phone: _nullableString(profile['phone']),
       deviceUid: boundUid,
-      deviceName: device?['device_name'] as String? ?? 'This device',
+      deviceName: _nullableString(device?['device_name']) ?? 'This device',
     );
   }
 
@@ -220,15 +226,25 @@ class EmployeeAuthApi {
 
 Employee employeeFromAuthPayload(Map<String, dynamic> json) {
   return Employee(
-    employeeNumber: json['employee_number'] as String? ?? '',
-    fullName: json['full_name'] as String? ?? '',
-    email: json['email'] as String?,
+    employeeNumber: _stringValue(json['employee_number']),
+    fullName: _stringValue(json['full_name']),
+    email: _nullableString(json['email']),
     department: Department(
-      name: json['department_name'] as String? ?? 'Unassigned',
-      code: json['department_code'] as String? ?? '—',
+      name: _nullableString(json['department_name']) ?? 'Unassigned',
+      code: _nullableString(json['department_code']) ?? '—',
     ),
-    phone: json['phone'] as String?,
-    deviceUid: json['device_uid'] as String?,
-    deviceName: json['device_name'] as String? ?? 'This device',
+    phone: _nullableString(json['phone']),
+    deviceUid: _nullableString(json['device_uid']),
+    deviceName: _nullableString(json['device_name']) ?? 'This device',
   );
+}
+
+String _stringValue(Object? value) => value?.toString().trim() ?? '';
+
+String? _nullableString(Object? value) {
+  final text = value?.toString().trim();
+  if (text == null || text.isEmpty) {
+    return null;
+  }
+  return text;
 }

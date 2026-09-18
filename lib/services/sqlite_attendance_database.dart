@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -5,6 +7,7 @@ import 'package:sqflite/sqflite.dart';
 import '../data/sample_data.dart';
 import '../models/models.dart';
 import 'attendance_stores.dart';
+import 'events_catalog.dart';
 
 const _localTable = 'attendance_records';
 const _remoteTable = 'remote_attendance_records';
@@ -14,6 +17,7 @@ CREATE TABLE IF NOT EXISTS {table} (
   client_record_id TEXT PRIMARY KEY NOT NULL,
   server_id TEXT,
   event_id TEXT NOT NULL,
+  event_json TEXT,
   employee_number TEXT NOT NULL,
   check_in_at TEXT,
   check_out_at TEXT,
@@ -44,13 +48,34 @@ class PeamAttendanceDatabase {
     final path = p.join(directory.path, 'peam_attendance.db');
     final database = await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute(_createSql.replaceAll('{table}', _localTable));
         await db.execute(_createSql.replaceAll('{table}', _remoteTable));
       },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute(
+            'ALTER TABLE $_localTable ADD COLUMN event_json TEXT',
+          );
+          await db.execute(
+            'ALTER TABLE $_remoteTable ADD COLUMN event_json TEXT',
+          );
+        }
+      },
     );
     return PeamAttendanceDatabase._(database);
+  }
+
+  Future<void> ensureEventJsonColumn() async {
+    await _addEventJsonColumn(_localTable);
+    await _addEventJsonColumn(_remoteTable);
+  }
+
+  Future<void> _addEventJsonColumn(String table) async {
+    try {
+      await db.execute('ALTER TABLE $table ADD COLUMN event_json TEXT');
+    } catch (_) {}
   }
 
   Future<void> seedDemoIfEmpty() async {
@@ -117,8 +142,24 @@ class SqliteAttendanceLocalStore implements AttendanceLocalStore {
     if (existing != null) {
       return existing;
     }
-    await _db.insert(_localTable, AttendanceRowCodec.toMap(record));
+    await _insert(record);
     return record;
+  }
+
+  Future<void> _insert(AttendanceRecord record) async {
+    try {
+      await _db.insert(_localTable, AttendanceRowCodec.toMap(record));
+    } catch (error) {
+      if (!_needsEventJson(error)) {
+        rethrow;
+      }
+      await _database.ensureEventJsonColumn();
+      await _db.insert(_localTable, AttendanceRowCodec.toMap(record));
+    }
+  }
+
+  bool _needsEventJson(Object error) {
+    return error.toString().contains('event_json');
   }
 
   @override
@@ -185,6 +226,7 @@ abstract final class AttendanceRowCodec {
       'client_record_id': record.clientRecordId,
       'server_id': record.serverId,
       'event_id': record.event.id,
+      'event_json': jsonEncode(provincialEventToRow(record.event)),
       'employee_number': record.employee.employeeNumber,
       'check_in_at': record.checkInAt.toIso8601String(),
       'check_out_at': record.checkOutAt?.toIso8601String(),
@@ -215,23 +257,22 @@ abstract final class AttendanceRowCodec {
     Map<String, Object?> row,
     Employee employee,
   ) {
-    final eventId = row['event_id'] as String?;
-    if (eventId == null) {
+    final eventId = row['event_id']?.toString();
+    final clientRecordId = row['client_record_id']?.toString();
+    if (eventId == null || eventId.isEmpty || clientRecordId == null) {
       return null;
     }
-    final event = SampleData.events.cast<ProvincialEvent?>().firstWhere(
-      (item) => item!.id == eventId,
-      orElse: () => null,
-    );
-    if (event == null) {
-      return null;
-    }
+    final event = _eventFromRow(row, eventId);
+    final checkInAt =
+        _parseTime(row['check_in_at']) ??
+        _parseTime(row['client_recorded_at']) ??
+        DateTime.now();
     return AttendanceRecord(
-      clientRecordId: row['client_record_id'] as String,
+      clientRecordId: clientRecordId,
       serverId: row['server_id'] as String?,
       event: event,
       employee: employee,
-      checkInAt: DateTime.parse(row['check_in_at'] as String),
+      checkInAt: checkInAt,
       checkOutAt: _parseTime(row['check_out_at']),
       checkInLatitude: (row['check_in_latitude'] as num?)?.toDouble(),
       checkInLongitude: (row['check_in_longitude'] as num?)?.toDouble(),
@@ -245,10 +286,51 @@ abstract final class AttendanceRowCodec {
       syncStatus: (row['sync_status'] as String?) == SyncStatus.synced.name
           ? SyncStatus.synced
           : SyncStatus.pending,
-      clientRecordedAt:
-          _parseTime(row['client_recorded_at']) ??
-          DateTime.parse(row['check_in_at'] as String),
+      clientRecordedAt: _parseTime(row['client_recorded_at']) ?? checkInAt,
       syncedAt: _parseTime(row['synced_at']),
+    );
+  }
+
+  static ProvincialEvent _eventFromRow(
+    Map<String, Object?> row,
+    String eventId,
+  ) {
+    final raw = row['event_json'];
+    if (raw is String && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          final event = provincialEventFromRow(
+            Map<String, dynamic>.from(decoded),
+            includeHidden: true,
+          );
+          if (event != null) {
+            return event;
+          }
+        }
+      } catch (_) {}
+    }
+    final sample = SampleData.events.cast<ProvincialEvent?>().firstWhere(
+      (item) => item!.id == eventId,
+      orElse: () => null,
+    );
+    if (sample != null) {
+      return sample;
+    }
+    return ProvincialEvent(
+      id: eventId,
+      name: 'Event',
+      description: '',
+      eventDate: DateTime.now(),
+      startTime: '—',
+      endTime: '—',
+      venue: '—',
+      location: const EventLocation(
+        latitude: 0,
+        longitude: 0,
+        geofenceRadiusMeters: 100,
+      ),
+      status: EventStatus.completed,
     );
   }
 

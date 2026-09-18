@@ -2,7 +2,7 @@ import '../models/models.dart';
 import 'attendance_stores.dart';
 import 'client_ids.dart';
 
-/// Uploads pending local rows to the mock Supabase store, then marks them synced.
+/// Uploads pending local rows to Supabase (or the prototype remote store).
 class AttendanceSyncService {
   const AttendanceSyncService();
 
@@ -15,19 +15,23 @@ class AttendanceSyncService {
     var uploaded = 0;
     for (final record in pending) {
       final syncedAt = DateTime.now().toUtc();
-      final remoteRow = await remote.upsert(
-        record.copyWith(
-          serverId: record.serverId ?? newClientRecordId(),
-          syncStatus: SyncStatus.synced,
-          syncedAt: syncedAt,
-        ),
-      );
-      await local.markSynced(
-        clientRecordId: record.clientRecordId,
-        serverId: remoteRow.serverId ?? record.clientRecordId,
-        syncedAt: remoteRow.syncedAt ?? syncedAt,
-      );
-      uploaded += 1;
+      try {
+        final remoteRow = await remote.upsert(
+          record.copyWith(
+            serverId: record.serverId ?? newClientRecordId(),
+            syncStatus: SyncStatus.synced,
+            syncedAt: syncedAt,
+          ),
+        );
+        await local.markSynced(
+          clientRecordId: record.clientRecordId,
+          serverId: remoteRow.serverId ?? record.clientRecordId,
+          syncedAt: remoteRow.syncedAt ?? syncedAt,
+        );
+        uploaded += 1;
+      } catch (_) {
+        // Leave the row pending so a later connectivity change can retry.
+      }
     }
     return uploaded;
   }

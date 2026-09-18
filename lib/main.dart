@@ -9,9 +9,12 @@ import 'services/biometric_auth_service.dart';
 import 'services/connectivity_controller.dart';
 import 'services/employee_auth_api.dart';
 import 'services/events_catalog.dart';
+import 'services/live_notification_source.dart';
 import 'services/location_service.dart';
+import 'services/notification_inbox.dart';
 import 'services/push_notification_service.dart';
 import 'services/sqlite_attendance_database.dart';
+import 'services/supabase_attendance_store.dart';
 import 'services/supabase_config.dart';
 import 'state/session_controller.dart';
 
@@ -44,12 +47,18 @@ Future<void> main() async {
   late final AttendanceRemoteStore remoteStore;
   try {
     final database = await PeamAttendanceDatabase.open();
-    await database.seedDemoIfEmpty();
+    if (!SupabaseConfig.isConfigured) {
+      await database.seedDemoIfEmpty();
+    }
     localStore = SqliteAttendanceLocalStore(database);
-    remoteStore = SqliteAttendanceRemoteStore(database);
+    remoteStore = SupabaseConfig.isConfigured
+        ? SupabaseAttendanceRemoteStore()
+        : SqliteAttendanceRemoteStore(database);
   } catch (_) {
     localStore = MemoryAttendanceLocalStore.withDemoSeed();
-    remoteStore = MemoryAttendanceRemoteStore.withDemoSeed();
+    remoteStore = SupabaseConfig.isConfigured
+        ? SupabaseAttendanceRemoteStore()
+        : MemoryAttendanceRemoteStore.withDemoSeed();
   }
 
   runApp(
@@ -65,6 +74,10 @@ Future<void> main() async {
         authStore: FileAuthSessionStore(),
         liveAuth: remoteAuth,
         eventsCatalog: eventsCatalog,
+        notificationInbox: FileNotificationInbox(),
+        liveNotifications: SupabaseConfig.isConfigured
+            ? LiveNotificationSource()
+            : null,
       ),
     ),
   );
