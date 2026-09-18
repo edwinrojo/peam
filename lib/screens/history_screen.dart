@@ -243,6 +243,16 @@ class _HistoryCard extends StatelessWidget {
                       fontSize: 13,
                     ),
                   ),
+                ] else if (record.event.requiresCheckOut) ...[
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Check-out required',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.peachDeep,
+                      fontSize: 13,
+                    ),
+                  ),
                 ],
                 const SizedBox(height: 8),
                 Wrap(

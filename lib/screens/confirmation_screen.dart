@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../models/models.dart';
 import '../state/session_controller.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_vectors.dart';
@@ -20,13 +21,20 @@ class ConfirmationScreen extends StatefulWidget {
 }
 
 class _ConfirmationScreenState extends State<ConfirmationScreen> {
+  AttendanceAction _action = AttendanceAction.checkIn;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final session = SessionScope.of(context);
+      _action = session.pendingAttendanceAction;
       unawaited(
-        SessionScope.of(context).confirmAttendance(checkInAt: DateTime.now()),
+        _action == AttendanceAction.checkOut
+            ? session.confirmCheckOut(checkOutAt: DateTime.now())
+            : session.confirmAttendance(checkInAt: DateTime.now()),
       );
+      setState(() {});
     });
   }
 
@@ -61,8 +69,10 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
-                        'Attendance confirmed',
+                      Text(
+                        _action == AttendanceAction.checkOut
+                            ? 'Checked out'
+                            : 'Attendance confirmed',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 28,
@@ -75,6 +85,8 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
                       Text(
                         event == null
                             ? 'Your attendance has been recorded.'
+                            : _action == AttendanceAction.checkOut
+                            ? 'Your check-out for ${event.name} is saved on this device and will sync when connectivity is available.'
                             : 'Your check-in for ${event.name} is saved on this device and will sync when connectivity is available.',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
@@ -101,6 +113,11 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
                                 label: 'Check-in',
                                 value: _timeLabel(record.checkInAt),
                               ),
+                              if (record.checkOutAt != null)
+                                _Info(
+                                  label: 'Check-out',
+                                  value: _timeLabel(record.checkOutAt!),
+                                ),
                               _Info(label: 'Venue', value: record.event.venue),
                               const _Info(
                                 label: 'Verification',

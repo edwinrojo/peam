@@ -19,7 +19,7 @@ id, event_id, check_in_at, check_out_at,
 check_in_latitude, check_in_longitude, check_out_latitude, check_out_longitude,
 geofence_verified, biometric_verified, verification_status, attendance_status,
 recorded_offline, sync_status, client_record_id, client_recorded_at, synced_at,
-events!event_id (id, name, description, event_date, start_time, end_time, venue, latitude, longitude, geofence_radius_meters, status)
+events!event_id (id, name, description, event_date, start_time, end_time, venue, latitude, longitude, geofence_radius_meters, status, requires_check_out)
 ''';
   static const _upsertSelect =
       'id, synced_at, attendance_status, verification_status, sync_status, client_record_id';
@@ -61,6 +61,9 @@ events!event_id (id, name, description, event_date, start_time, end_time, venue,
         employee: record.employee,
       );
       if (existing != null) {
+        if (record.checkOutAt != null) {
+          return _updateCheckout(existing: existing, record: record);
+        }
         return existing;
       }
       rethrow;
@@ -127,6 +130,32 @@ events!event_id (id, name, description, event_date, start_time, end_time, venue,
       return null;
     }
     return attendanceRecordFromSupabaseRow(row, employee);
+  }
+
+  Future<AttendanceRecord> _updateCheckout({
+    required AttendanceRecord existing,
+    required AttendanceRecord record,
+  }) async {
+    final row = await _client
+        .from('attendance_records')
+        .update({
+          'check_out_at': record.checkOutAt!.toUtc().toIso8601String(),
+          'check_out_latitude': record.checkOutLatitude,
+          'check_out_longitude': record.checkOutLongitude,
+        })
+        .eq('id', existing.serverId ?? existing.clientRecordId)
+        .select(_upsertSelect)
+        .single()
+        .timeout(_timeout);
+    return _fallbackSynced(
+      existing.copyWith(
+        checkOutAt: record.checkOutAt,
+        checkOutLatitude: record.checkOutLatitude,
+        checkOutLongitude: record.checkOutLongitude,
+        attendanceStatus: AttendanceStatus.present,
+      ),
+      row,
+    );
   }
 
   AttendanceRecord _fallbackSynced(

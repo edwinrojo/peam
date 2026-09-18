@@ -78,6 +78,7 @@ void main() {
     expect(restored, isNotNull);
     expect(restored!.event.id, event.id);
     expect(restored.event.name, 'Capitol Flag Ceremony');
+    expect(restored.event.requiresCheckOut, isFalse);
     expect(restored.recordedOffline, isTrue);
   });
 
@@ -237,6 +238,114 @@ void main() {
       isEmpty,
     );
     expect(session.lastAttendance?.event.id, isNot('evt-health'));
+  });
+
+  test('check-in is present when the event does not require check-out', () async {
+    final session = SessionController(
+      localStore: MemoryAttendanceLocalStore(),
+      remoteStore: MemoryAttendanceRemoteStore(),
+      connectivity: ConnectivityController(),
+      pushNotifications: PushNotificationService(enableSystemBanners: false),
+    );
+    addTearDown(session.dispose);
+
+    final error = await session.completePrototypeLogin(
+      SampleData.demoEmployee.employeeNumber,
+    );
+    expect(error, isNull);
+
+    final now = DateTime.now();
+    session.selectEvent(
+      ProvincialEvent(
+        id: 'evt-no-checkout',
+        name: 'Flag ceremony',
+        description: '',
+        eventDate: DateTime(now.year, now.month, now.day),
+        startTime: '8:00 AM',
+        endTime: '11:59 PM',
+        venue: 'Capitol',
+        location: SampleData.capitol,
+        status: EventStatus.ongoing,
+      ),
+    );
+    await session.confirmAttendance(checkInAt: DateTime(now.year, now.month, now.day, 9));
+
+    expect(session.history, hasLength(1));
+    expect(session.history.single.attendanceStatus, AttendanceStatus.present);
+    expect(session.history.single.checkOutAt, isNull);
+  });
+
+  test('check-out updates the same attendance row to present', () async {
+    final session = SessionController(
+      localStore: MemoryAttendanceLocalStore(),
+      remoteStore: MemoryAttendanceRemoteStore(),
+      connectivity: ConnectivityController(),
+      pushNotifications: PushNotificationService(enableSystemBanners: false),
+    );
+    addTearDown(session.dispose);
+
+    final error = await session.completePrototypeLogin(
+      SampleData.demoEmployee.employeeNumber,
+    );
+    expect(error, isNull);
+
+    session.selectEvent(SampleData.events.first);
+    await session.confirmAttendance(checkInAt: DateTime(2026, 8, 25, 8, 15));
+    expect(session.history.single.attendanceStatus, AttendanceStatus.incomplete);
+
+    await session.confirmCheckOut(checkOutAt: DateTime(2026, 8, 25, 11, 30));
+
+    expect(session.history, hasLength(1));
+    expect(session.history.single.checkOutAt, DateTime(2026, 8, 25, 11, 30));
+    expect(session.history.single.attendanceStatus, AttendanceStatus.present);
+    expect(session.history.single.isPending, isTrue);
+
+    await session.simulateOnlineAndSync();
+    expect(session.history.single.syncStatus, SyncStatus.synced);
+    expect(session.remoteRecordCount, 1);
+  });
+
+  test('check-out is rejected when the employee has not checked in', () async {
+    final session = SessionController(
+      localStore: MemoryAttendanceLocalStore(),
+      remoteStore: MemoryAttendanceRemoteStore(),
+      connectivity: ConnectivityController(),
+      pushNotifications: PushNotificationService(enableSystemBanners: false),
+    );
+    addTearDown(session.dispose);
+
+    final error = await session.completePrototypeLogin(
+      SampleData.demoEmployee.employeeNumber,
+    );
+    expect(error, isNull);
+
+    session.selectEvent(SampleData.events.first);
+    await session.confirmCheckOut(checkOutAt: DateTime(2026, 8, 25, 11, 30));
+
+    expect(session.history, isEmpty);
+    expect(session.lastAttendance, isNull);
+  });
+
+  test('local store merges check-out onto the existing event row', () async {
+    final local = MemoryAttendanceLocalStore();
+    final employee = SampleData.demoEmployee;
+    final first = checkInRecord(clientRecordId: 'client-a', employee: employee);
+    await local.upsert(first);
+
+    final stored = await local.upsert(
+      first.copyWith(
+        checkOutAt: DateTime(2026, 8, 25, 11, 45),
+        checkOutLatitude: first.event.location.latitude,
+        checkOutLongitude: first.event.location.longitude,
+        attendanceStatus: AttendanceStatus.present,
+      ),
+    );
+    final rows = await local.listForEmployee(employee);
+
+    expect(rows, hasLength(1));
+    expect(stored.clientRecordId, 'client-a');
+    expect(stored.checkOutAt, DateTime(2026, 8, 25, 11, 45));
+    expect(stored.attendanceStatus, AttendanceStatus.present);
   });
 }
 

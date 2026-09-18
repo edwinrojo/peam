@@ -10,8 +10,8 @@ abstract class AttendanceLocalStore {
     required Employee employee,
   });
 
-  /// Inserts a new row. If this employee already has a row for the event,
-  /// the existing row is returned unchanged (one record per employee per event).
+  /// Inserts a new row, or merges check-out / sync fields into the existing
+  /// employee+event row (one record per employee per event).
   Future<AttendanceRecord> upsert(AttendanceRecord record);
 
   Future<List<AttendanceRecord>> pendingFor(Employee employee);
@@ -73,7 +73,14 @@ class MemoryAttendanceLocalStore implements AttendanceLocalStore {
       employee: record.employee,
     );
     if (existing != null) {
-      return existing;
+      final merged = mergeAttendanceRecords(existing, record);
+      final index = _records.indexWhere(
+        (item) => item.clientRecordId == existing.clientRecordId,
+      );
+      if (index >= 0) {
+        _records[index] = merged;
+      }
+      return merged;
     }
     _records.insert(0, record);
     return record;
@@ -144,4 +151,47 @@ class MemoryAttendanceRemoteStore implements AttendanceRemoteStore {
         )
         .toList();
   }
+}
+
+/// Combines an existing local row with a later check-out or remote snapshot.
+AttendanceRecord mergeAttendanceRecords(
+  AttendanceRecord existing,
+  AttendanceRecord incoming,
+) {
+  final keepLocalCheckout =
+      existing.checkOutAt != null && incoming.checkOutAt == null;
+  if (keepLocalCheckout) {
+    return existing.copyWith(serverId: incoming.serverId ?? existing.serverId);
+  }
+
+  final checkOutAt = incoming.checkOutAt ?? existing.checkOutAt;
+  final incomingIsDuplicateCheckIn =
+      incoming.checkOutAt == null &&
+      existing.checkOutAt == null &&
+      incoming.syncStatus == existing.syncStatus &&
+      incoming.attendanceStatus == existing.attendanceStatus;
+  if (incomingIsDuplicateCheckIn) {
+    return existing;
+  }
+
+  return AttendanceRecord(
+    clientRecordId: existing.clientRecordId,
+    serverId: incoming.serverId ?? existing.serverId,
+    event: incoming.event,
+    employee: existing.employee,
+    checkInAt: existing.checkInAt,
+    checkOutAt: checkOutAt,
+    checkInLatitude: existing.checkInLatitude ?? incoming.checkInLatitude,
+    checkInLongitude: existing.checkInLongitude ?? incoming.checkInLongitude,
+    checkOutLatitude: incoming.checkOutLatitude ?? existing.checkOutLatitude,
+    checkOutLongitude: incoming.checkOutLongitude ?? existing.checkOutLongitude,
+    recordedOffline: existing.recordedOffline || incoming.recordedOffline,
+    geofenceVerified: existing.geofenceVerified || incoming.geofenceVerified,
+    biometricVerified: existing.biometricVerified || incoming.biometricVerified,
+    verificationStatus: incoming.verificationStatus,
+    attendanceStatus: incoming.attendanceStatus,
+    syncStatus: incoming.syncStatus,
+    clientRecordedAt: existing.clientRecordedAt,
+    syncedAt: incoming.syncedAt ?? existing.syncedAt,
+  );
 }

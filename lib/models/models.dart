@@ -85,6 +85,7 @@ class ProvincialEvent {
     required this.venue,
     required this.location,
     required this.status,
+    this.requiresCheckOut = false,
   });
 
   final String id;
@@ -96,6 +97,7 @@ class ProvincialEvent {
   final String venue;
   final EventLocation location;
   final EventStatus status;
+  final bool requiresCheckOut;
 
   String get scheduleLabel => '$startTime – $endTime';
 
@@ -146,6 +148,17 @@ class ProvincialEvent {
       return status == EventStatus.ongoing;
     }
     return (now ?? DateTime.now()).isBefore(end);
+  }
+
+  /// Check-out stays available after the event ends, until it is recorded.
+  bool allowsCheckOut() {
+    return requiresCheckOut &&
+        status != EventStatus.draft &&
+        status != EventStatus.cancelled;
+  }
+
+  bool needsCheckOut(AttendanceRecord? record) {
+    return allowsCheckOut() && record != null && record.checkOutAt == null;
   }
 
   String get dateLabel {
@@ -292,7 +305,10 @@ class AttendanceRecord {
 
   AttendanceRecord copyWith({
     String? serverId,
+    ProvincialEvent? event,
     DateTime? checkOutAt,
+    double? checkOutLatitude,
+    double? checkOutLongitude,
     bool? recordedOffline,
     AttendanceStatus? attendanceStatus,
     SyncStatus? syncStatus,
@@ -301,14 +317,14 @@ class AttendanceRecord {
     return AttendanceRecord(
       clientRecordId: clientRecordId,
       serverId: serverId ?? this.serverId,
-      event: event,
+      event: event ?? this.event,
       checkInAt: checkInAt,
       checkOutAt: checkOutAt ?? this.checkOutAt,
       employee: employee,
       checkInLatitude: checkInLatitude,
       checkInLongitude: checkInLongitude,
-      checkOutLatitude: checkOutLatitude,
-      checkOutLongitude: checkOutLongitude,
+      checkOutLatitude: checkOutLatitude ?? this.checkOutLatitude,
+      checkOutLongitude: checkOutLongitude ?? this.checkOutLongitude,
       recordedOffline: recordedOffline ?? this.recordedOffline,
       geofenceVerified: geofenceVerified,
       biometricVerified: biometricVerified,
@@ -320,3 +336,5 @@ class AttendanceRecord {
     );
   }
 }
+
+enum AttendanceAction { checkIn, checkOut }

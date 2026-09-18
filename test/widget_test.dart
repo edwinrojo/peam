@@ -61,6 +61,8 @@ void main() {
 
     expect(find.text('Official events'), findsOneWidget);
     expect(find.text('Provincial Employees Assembly 2026'), findsOneWidget);
+    expect(find.text('Check-out required'), findsWidgets);
+    expect(find.text('Check-in'), findsWidgets);
     expect(
       find.text('Good day, ${SampleData.demoEmployee.firstName}'),
       findsOneWidget,
@@ -118,6 +120,36 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Official events'), findsOneWidget);
+    expect(find.text('Check out'), findsWidgets);
+
+    await tester.ensureVisible(
+      find.byKey(const Key('event-card-evt-assembly')),
+    );
+    await tester.tap(find.byKey(const Key('event-card-evt-assembly')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Check out'), findsWidgets);
+    expect(find.text('Check-out'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('check-in-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('biometric-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Checked out'), findsOneWidget);
+    expect(find.text('Check-out'), findsWidgets);
+
+    await tester.tap(find.byKey(const Key('confirmation-done')));
+    await tester.pumpAndSettle();
+    expect(find.text('Recorded'), findsWidgets);
+
+    await tester.ensureVisible(
+      find.byKey(const Key('event-card-evt-assembly')),
+    );
+    await tester.tap(find.byKey(const Key('event-card-evt-assembly')));
+    await tester.pumpAndSettle();
+    expect(find.text('Official events'), findsOneWidget);
+    expect(find.byKey(const Key('check-in-button')), findsNothing);
   });
 
   testWidgets('check-in stays on the event when GPS is outside the geofence', (

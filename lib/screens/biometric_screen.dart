@@ -78,10 +78,16 @@ class _BiometricScreenState extends State<BiometricScreen> {
       return;
     }
     final event = SessionScope.of(context).selectedEvent;
-    if (event == null || !event.allowsCheckIn()) {
+    final session = SessionScope.of(context);
+    final checkingOut =
+        event != null && event.needsCheckOut(session.recordFor(event.id));
+    if (event == null ||
+        (checkingOut ? !event.allowsCheckOut() : !event.allowsCheckIn())) {
       setState(() {
         _scanning = false;
-        _error = 'Check-in closed. This event has ended.';
+        _error = checkingOut
+            ? 'Check-out is not available for this event.'
+            : 'Check-in closed. This event has ended.';
       });
       return;
     }

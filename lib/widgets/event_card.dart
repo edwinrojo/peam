@@ -10,13 +10,15 @@ class EventCard extends StatelessWidget {
   const EventCard({
     super.key,
     required this.event,
-    required this.onTap,
+    this.onTap,
     this.actionLabel = 'Open',
+    this.enabled = true,
   });
 
   final ProvincialEvent event;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final String actionLabel;
+  final bool enabled;
 
   Color get _accent {
     return switch (event.effectiveStatus()) {
@@ -47,89 +49,99 @@ class EventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SoftCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: _accent,
-                  borderRadius: BorderRadius.circular(16),
+    return Opacity(
+      opacity: enabled ? 1 : 0.55,
+      child: SoftCard(
+        onTap: enabled ? onTap : null,
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: _accent,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: AppVector(_badgeAsset, width: 40, height: 40),
                 ),
-                child: AppVector(_badgeAsset, width: 40, height: 40),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      event.name,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.ink,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        event.name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      event.venue,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.muted,
+                      const SizedBox(height: 4),
+                      Text(
+                        event.venue,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.muted,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              _StatusChip(event: event, color: _accentDeep, fill: _accent),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            event.description,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 13,
-              height: 1.4,
-              color: AppColors.muted,
+                _StatusChip(event: event, color: _accentDeep, fill: _accent),
+              ],
             ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _Meta(
-                      icon: Icons.calendar_today_outlined,
-                      label: event.cardDateLabel,
-                    ),
-                    const SizedBox(height: 8),
-                    _Meta(
-                      icon: Icons.schedule_outlined,
-                      label: event.scheduleLabel,
-                    ),
-                  ],
-                ),
+            const SizedBox(height: 14),
+            Text(
+              event.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                color: AppColors.muted,
               ),
-              const SizedBox(width: 12),
-              _ActionBadge(label: actionLabel),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _Meta(
+                        icon: Icons.calendar_today_outlined,
+                        label: event.cardDateLabel,
+                      ),
+                      const SizedBox(height: 8),
+                      _Meta(
+                        icon: Icons.schedule_outlined,
+                        label: event.scheduleLabel,
+                      ),
+                      if (event.requiresCheckOut) ...[
+                        const SizedBox(height: 8),
+                        const _Meta(
+                          icon: Icons.logout_rounded,
+                          label: 'Check-out required',
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                _ActionBadge(label: actionLabel),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -173,10 +185,15 @@ class _ActionBadge extends StatelessWidget {
 
   ({Color fill, Color foreground, IconData icon}) get _style {
     return switch (label) {
-      'Open' => (
+      'Open' || 'Check-in' => (
         fill: AppColors.mint,
         foreground: AppColors.mintDeep,
         icon: Icons.login_rounded,
+      ),
+      'Check out' => (
+        fill: AppColors.peach,
+        foreground: AppColors.peachDeep,
+        icon: Icons.logout_rounded,
       ),
       'Ended' => (
         fill: AppColors.lavender,

@@ -18,6 +18,7 @@ void main() {
       'longitude': 125.3571,
       'geofence_radius_meters': 120,
       'status': 'ongoing',
+      'requires_check_out': true,
     });
 
     expect(event, isNotNull);
@@ -27,6 +28,7 @@ void main() {
     expect(event.eventDate, DateTime(2026, 8, 25));
     expect(event.location.latitude, closeTo(6.7492, 0.0001));
     expect(event.status, EventStatus.ongoing);
+    expect(event.requiresCheckOut, isTrue);
   });
 
   test('a published event today during its hours shows as Ongoing', () {

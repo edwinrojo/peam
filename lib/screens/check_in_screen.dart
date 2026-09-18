@@ -41,17 +41,46 @@ class _CheckInScreenState extends State<CheckInScreen> {
     });
   }
 
+  bool _isCheckingOut(ProvincialEvent event) {
+    return event.needsCheckOut(SessionScope.of(context).recordFor(event.id));
+  }
+
+  bool _alreadyRecorded(ProvincialEvent event) {
+    final record = SessionScope.of(context).recordFor(event.id);
+    return record != null && !event.needsCheckOut(record);
+  }
+
+  bool _windowOpen(ProvincialEvent event) {
+    if (_alreadyRecorded(event)) {
+      return false;
+    }
+    return _isCheckingOut(event)
+        ? event.allowsCheckOut()
+        : event.allowsCheckIn();
+  }
+
   Future<void> _locate() async {
     final event = _event;
     if (event == null) {
       return;
     }
-    if (!event.allowsCheckIn()) {
+    if (_alreadyRecorded(event)) {
       SessionScope.of(context).stageGeofence(null);
       setState(() {
         _loading = false;
         _check = null;
-        _error = 'Check-in closed at ${event.endTime}. This event has ended.';
+        _error = 'Attendance for this event is already recorded.';
+      });
+      return;
+    }
+    if (!_windowOpen(event)) {
+      SessionScope.of(context).stageGeofence(null);
+      setState(() {
+        _loading = false;
+        _check = null;
+        _error = _isCheckingOut(event)
+            ? 'Check-out is not available for this event.'
+            : 'Check-in closed at ${event.endTime}. This event has ended.';
       });
       return;
     }
@@ -88,185 +117,234 @@ class _CheckInScreenState extends State<CheckInScreen> {
     final event = _event;
     final check = _check;
     if (event == null ||
-        !event.allowsCheckIn() ||
+        !_windowOpen(event) ||
         check == null ||
         !check.isInside) {
       return;
     }
     SessionScope.of(context).selectEvent(event);
     SessionScope.of(context).stageGeofence(check);
+    SessionScope.of(context).stageAttendanceAction(
+      _isCheckingOut(event)
+          ? AttendanceAction.checkOut
+          : AttendanceAction.checkIn,
+    );
     Navigator.of(context).pushNamed(BiometricScreen.routeName);
   }
 
   @override
   Widget build(BuildContext context) {
-    final event = _event;
-    if (event == null) {
-      return const Scaffold(body: Center(child: Text('No event selected.')));
-    }
+    return ListenableBuilder(
+      listenable: SessionScope.of(context),
+      builder: (context, _) {
+        final event = _event;
+        if (event == null) {
+          return const Scaffold(
+            body: Center(child: Text('No event selected.')),
+          );
+        }
 
-    final check = _check;
-    final inside = check?.isInside ?? false;
-    final windowOpen = event.allowsCheckIn();
+        final check = _check;
+        final inside = check?.isInside ?? false;
+        final checkingOut = _isCheckingOut(event);
+        final alreadyRecorded = _alreadyRecorded(event);
+        final windowOpen = _windowOpen(event);
+        final actionLabel = checkingOut ? 'Check-out' : 'Check-in';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Check in'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-              children: [
-                Text(
-                  event.name,
-                  style: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  event.description,
-                  style: const TextStyle(color: AppColors.muted, height: 1.45),
-                ),
-                const SizedBox(height: 18),
-                GeofenceMap(
-                  event: event,
-                  employee: check?.position,
-                  check: check,
-                ),
-                const SizedBox(height: 16),
-                SoftCard(
-                  padding: const EdgeInsets.all(14),
-                  child: Row(
-                    children: [
-                      const AppVector(AppVectors.mapPin, width: 56, height: 56),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _loading
-                                  ? 'Checking your location'
-                                  : !windowOpen
-                                  ? 'Check-in closed'
-                                  : inside
-                                  ? 'Location verified'
-                                  : 'Outside the event area',
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(checkingOut ? 'Check out' : 'Check in'),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+              onPressed: () => Navigator.of(context).maybePop(),
+            ),
+          ),
+          body: Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                  children: [
+                    Text(
+                      event.name,
+                      style: const TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.ink,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      event.description,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        height: 1.45,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    GeofenceMap(
+                      event: event,
+                      employee: check?.position,
+                      check: check,
+                    ),
+                    const SizedBox(height: 16),
+                    SoftCard(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                        children: [
+                          const AppVector(
+                            AppVectors.mapPin,
+                            width: 56,
+                            height: 56,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _loading
+                                      ? 'Checking your location'
+                                      : alreadyRecorded
+                                      ? 'Already recorded'
+                                      : !windowOpen
+                                      ? (checkingOut
+                                            ? 'Check-out unavailable'
+                                            : 'Check-in closed')
+                                      : inside
+                                      ? 'Location verified'
+                                      : 'Outside the event area',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.ink,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  alreadyRecorded
+                                      ? 'This event already has your attendance on this device.'
+                                      : !windowOpen
+                                      ? (checkingOut
+                                            ? 'Check-out is not available for this event.'
+                                            : 'Check-in closed at ${event.endTime}. This event has ended.')
+                                      : event.venue,
+                                  style: const TextStyle(
+                                    color: AppColors.muted,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SoftCard(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          _DetailRow(
+                            icon: Icons.calendar_today_outlined,
+                            label: event.dateLabel,
+                          ),
+                          _DetailRow(
+                            icon: Icons.schedule_outlined,
+                            label: event.scheduleLabel,
+                          ),
+                          _DetailRow(
+                            icon: Icons.location_on_outlined,
+                            label: event.venue,
+                          ),
+                          _DetailRow(
+                            icon: Icons.radar_outlined,
+                            label:
+                                'Geofence ${event.location.geofenceRadiusMeters} m · ${event.location.latitude.toStringAsFixed(4)}, ${event.location.longitude.toStringAsFixed(4)}',
+                            isLast: !event.requiresCheckOut && check == null,
+                          ),
+                          if (event.requiresCheckOut)
+                            _DetailRow(
+                              icon: Icons.logout_rounded,
+                              label: checkingOut
+                                  ? 'Check-out required to complete attendance'
+                                  : alreadyRecorded
+                                  ? 'Check-out recorded'
+                                  : 'This event requires a check-out',
+                              isLast: check == null,
+                            ),
+                          if (check != null)
+                            _DetailRow(
+                              icon: Icons.my_location_outlined,
+                              label:
+                                  'Your GPS · ${check.position.coordinateLabel}',
+                              isLast: true,
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    SoftCard(
+                      color: _statusColor,
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Icon(_statusIcon, color: _statusIconColor),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _statusMessage(event),
                               style: const TextStyle(
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w600,
                                 color: AppColors.ink,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              !windowOpen
-                                  ? 'Check-in closed at ${event.endTime}. This event has ended.'
-                                  : event.venue,
-                              style: const TextStyle(
-                                color: AppColors.muted,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SoftCard(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      _DetailRow(
-                        icon: Icons.calendar_today_outlined,
-                        label: event.dateLabel,
-                      ),
-                      _DetailRow(
-                        icon: Icons.schedule_outlined,
-                        label: event.scheduleLabel,
-                      ),
-                      _DetailRow(
-                        icon: Icons.location_on_outlined,
-                        label: event.venue,
-                      ),
-                      _DetailRow(
-                        icon: Icons.radar_outlined,
-                        label:
-                            'Geofence ${event.location.geofenceRadiusMeters} m · ${event.location.latitude.toStringAsFixed(4)}, ${event.location.longitude.toStringAsFixed(4)}',
-                        isLast: check == null,
-                      ),
-                      if (check != null)
-                        _DetailRow(
-                          icon: Icons.my_location_outlined,
-                          label: 'Your GPS · ${check.position.coordinateLabel}',
-                          isLast: true,
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                SoftCard(
-                  color: _statusColor,
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Icon(_statusIcon, color: _statusIconColor),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          _statusMessage(event),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.ink,
                           ),
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
+                  ],
+                ),
+              ),
+              SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                  child: PrimaryButton(
+                    key: const Key('check-in-button'),
+                    label: alreadyRecorded
+                        ? 'Already recorded'
+                        : !windowOpen
+                        ? (checkingOut
+                              ? 'Check-out unavailable'
+                              : 'Event ended')
+                        : _loading
+                        ? 'Checking location'
+                        : inside
+                        ? actionLabel
+                        : 'Recheck location',
+                    icon: alreadyRecorded
+                        ? Icons.check_rounded
+                        : !windowOpen
+                        ? Icons.event_busy_rounded
+                        : inside
+                        ? (checkingOut
+                              ? Icons.logout_rounded
+                              : Icons.how_to_reg_rounded)
+                        : Icons.my_location_rounded,
+                    loading: _loading,
+                    onPressed: !windowOpen || _loading
+                        ? null
+                        : inside
+                        ? _continue
+                        : _locate,
                   ),
                 ),
-              ],
-            ),
-          ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-              child: PrimaryButton(
-                key: const Key('check-in-button'),
-                label: !windowOpen
-                    ? 'Event ended'
-                    : _loading
-                    ? 'Checking location'
-                    : inside
-                    ? 'Check-in'
-                    : 'Recheck location',
-                icon: !windowOpen
-                    ? Icons.event_busy_rounded
-                    : inside
-                    ? Icons.how_to_reg_rounded
-                    : Icons.my_location_rounded,
-                loading: _loading,
-                onPressed: !windowOpen || _loading
-                    ? null
-                    : inside
-                    ? _continue
-                    : _locate,
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -274,8 +352,10 @@ class _CheckInScreenState extends State<CheckInScreen> {
     if (_loading) {
       return AppColors.sky;
     }
+    final event = _event;
     if (_error != null ||
-        _event?.allowsCheckIn() != true ||
+        event == null ||
+        !_windowOpen(event) ||
         _check?.isInside != true) {
       return AppColors.peach;
     }
@@ -286,7 +366,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
     if (_loading) {
       return Icons.gps_fixed;
     }
-    if (_event?.allowsCheckIn() != true) {
+    final event = _event;
+    if (event != null && !_windowOpen(event)) {
       return Icons.event_busy_outlined;
     }
     if (_error != null) {
@@ -309,8 +390,14 @@ class _CheckInScreenState extends State<CheckInScreen> {
   }
 
   String _statusMessage(ProvincialEvent event) {
-    if (!event.allowsCheckIn()) {
-      return 'Check-in closed at ${event.endTime}. This event has ended.';
+    final checkingOut = _isCheckingOut(event);
+    if (_alreadyRecorded(event)) {
+      return 'Attendance for this event is already recorded.';
+    }
+    if (!_windowOpen(event)) {
+      return checkingOut
+          ? 'Check-out is not available for this event.'
+          : 'Check-in closed at ${event.endTime}. This event has ended.';
     }
     if (_loading) {
       return 'Reading GPS to confirm you are inside the ${event.location.geofenceRadiusMeters} m geofence.';
@@ -320,7 +407,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
     }
     final check = _check;
     if (check == null) {
-      return 'Location is required before check-in.';
+      return checkingOut
+          ? 'Location is required before check-out.'
+          : 'Location is required before check-in.';
     }
     if (check.isInside) {
       return 'You are ${check.distanceLabel} from the venue and inside the permitted area.';

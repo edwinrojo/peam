@@ -140,10 +140,34 @@ class SqliteAttendanceLocalStore implements AttendanceLocalStore {
       employee: record.employee,
     );
     if (existing != null) {
-      return existing;
+      final merged = mergeAttendanceRecords(existing, record);
+      await _replace(merged);
+      return merged;
     }
     await _insert(record);
     return record;
+  }
+
+  Future<void> _replace(AttendanceRecord record) async {
+    try {
+      await _db.update(
+        _localTable,
+        AttendanceRowCodec.toMap(record),
+        where: 'client_record_id = ?',
+        whereArgs: [record.clientRecordId],
+      );
+    } catch (error) {
+      if (!_needsEventJson(error)) {
+        rethrow;
+      }
+      await _database.ensureEventJsonColumn();
+      await _db.update(
+        _localTable,
+        AttendanceRowCodec.toMap(record),
+        where: 'client_record_id = ?',
+        whereArgs: [record.clientRecordId],
+      );
+    }
   }
 
   Future<void> _insert(AttendanceRecord record) async {

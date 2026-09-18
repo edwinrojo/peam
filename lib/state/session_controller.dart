@@ -94,6 +94,7 @@ class SessionController extends ChangeNotifier {
   bool isLoadingEvents = false;
   String? eventsError;
   GeofenceCheck? stagedGeofence;
+  AttendanceAction pendingAttendanceAction = AttendanceAction.checkIn;
   bool _disposed = false;
   Future<int>? _syncInFlight;
 
@@ -503,6 +504,10 @@ class SessionController extends ChangeNotifier {
     stagedGeofence = check;
   }
 
+  void stageAttendanceAction(AttendanceAction action) {
+    pendingAttendanceAction = action;
+  }
+
   void simulateOffline() {
     _connectivity.simulateOffline();
   }
@@ -557,7 +562,9 @@ class SessionController extends ChangeNotifier {
       geofenceVerified: staged?.isInside ?? true,
       biometricVerified: true,
       verificationStatus: VerificationStatus.verified,
-      attendanceStatus: AttendanceStatus.incomplete,
+      attendanceStatus: event.requiresCheckOut
+          ? AttendanceStatus.incomplete
+          : AttendanceStatus.present,
       syncStatus: SyncStatus.pending,
       clientRecordedAt: checkInAt,
     );
@@ -589,6 +596,77 @@ class SessionController extends ChangeNotifier {
       await _syncWhenOnline();
     } catch (error) {
       debugPrint('PEAM attendance upload failed: $error');
+    }
+    await _reloadHistory();
+  }
+
+  Future<void> confirmCheckOut({required DateTime checkOutAt}) async {
+    final currentEmployee = employee;
+    final event = selectedEvent;
+    if (currentEmployee == null || event == null) {
+      return;
+    }
+    if (!event.allowsCheckOut()) {
+      return;
+    }
+
+    final existing = await _local.find(
+      eventId: event.id,
+      employee: currentEmployee,
+    );
+    if (existing == null || existing.checkOutAt != null) {
+      lastAttendance = existing;
+      await _reloadHistory();
+      return;
+    }
+    if (checkOutAt.isBefore(existing.checkInAt)) {
+      return;
+    }
+
+    final staged = stagedGeofence;
+    if (staged != null && !staged.isInside) {
+      return;
+    }
+
+    final recordedOffline = existing.recordedOffline || !_connectivity.isOnline;
+    final record = existing.copyWith(
+      event: event,
+      checkOutAt: checkOutAt,
+      checkOutLatitude: staged?.position.latitude ?? event.location.latitude,
+      checkOutLongitude: staged?.position.longitude ?? event.location.longitude,
+      recordedOffline: recordedOffline,
+      attendanceStatus: AttendanceStatus.present,
+      syncStatus: SyncStatus.pending,
+    );
+    try {
+      await _local.upsert(record);
+    } catch (error) {
+      debugPrint('PEAM local check-out save failed: $error');
+      return;
+    }
+    lastAttendance = record;
+    stagedGeofence = null;
+    pendingAttendanceAction = AttendanceAction.checkIn;
+    _history = [
+      record,
+      for (final item in _history)
+        if (item.event.id != record.event.id) item,
+    ];
+    _notify();
+    await addNotification(
+      title: recordedOffline
+          ? 'Check-out recorded offline'
+          : 'Check-out saved on device',
+      body: recordedOffline
+          ? 'Your check-out for ${event.name} is saved on this device and will sync when connectivity returns.'
+          : 'Your check-out for ${event.name} is saved on this phone and will upload to PEAM.',
+      kind: NotificationKind.attendanceSync,
+      showSystemBanner: true,
+    );
+    try {
+      await _syncWhenOnline();
+    } catch (error) {
+      debugPrint('PEAM check-out upload failed: $error');
     }
     await _reloadHistory();
   }

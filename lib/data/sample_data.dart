@@ -55,6 +55,7 @@ abstract final class SampleData {
       venue: 'Provincial Capitol Grounds, Digos City',
       location: capitol,
       status: EventStatus.ongoing,
+      requiresCheckOut: true,
     ),
     ProvincialEvent(
       id: 'evt-health',
@@ -87,6 +88,7 @@ abstract final class SampleData {
         geofenceRadiusMeters: 100,
       ),
       status: EventStatus.published,
+      requiresCheckOut: true,
     ),
     ProvincialEvent(
       id: 'evt-briefing',
@@ -99,6 +101,7 @@ abstract final class SampleData {
       venue: 'PGO Conference Hall, Provincial Capitol',
       location: capitol,
       status: EventStatus.completed,
+      requiresCheckOut: true,
     ),
   ];
 

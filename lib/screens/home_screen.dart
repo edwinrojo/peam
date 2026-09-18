@@ -340,22 +340,24 @@ class _HomeScreenState extends State<HomeScreen> {
               else
                 ...events.map((event) {
                   final recorded = session.recordFor(event.id);
+                  final canOpen =
+                      event.needsCheckOut(recorded) || recorded == null;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 14),
                     child: EventCard(
                       key: Key('event-card-${event.id}'),
                       event: event,
-                      actionLabel: recorded == null
-                          ? (event.allowsCheckIn() ? 'Open' : 'Ended')
-                          : recorded.isPending
-                          ? 'Pending'
-                          : 'Recorded',
-                      onTap: () {
-                        session.selectEvent(event);
-                        Navigator.of(
-                          context,
-                        ).pushNamed(CheckInScreen.routeName, arguments: event);
-                      },
+                      enabled: canOpen,
+                      actionLabel: _eventActionLabel(event, recorded),
+                      onTap: canOpen
+                          ? () {
+                              session.selectEvent(event);
+                              Navigator.of(context).pushNamed(
+                                CheckInScreen.routeName,
+                                arguments: event,
+                              );
+                            }
+                          : null,
                     ),
                   );
                 }),
@@ -365,6 +367,19 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+}
+
+String _eventActionLabel(ProvincialEvent event, AttendanceRecord? recorded) {
+  if (recorded == null) {
+    return event.allowsCheckIn() ? 'Check-in' : 'Ended';
+  }
+  if (event.needsCheckOut(recorded)) {
+    return 'Check out';
+  }
+  if (recorded.isPending) {
+    return 'Pending';
+  }
+  return 'Recorded';
 }
 
 class _CategoryTile extends StatelessWidget {

@@ -32,7 +32,7 @@ class SupabaseEventsCatalog implements EventsCatalog {
     final response = await _client
         .from('events')
         .select(
-          'id, name, description, event_date, start_time, end_time, venue, latitude, longitude, geofence_radius_meters, status',
+          'id, name, description, event_date, start_time, end_time, venue, latitude, longitude, geofence_radius_meters, status, requires_check_out',
         )
         .inFilter('status', const ['published', 'ongoing', 'completed'])
         .order('event_date')
@@ -176,6 +176,7 @@ ProvincialEvent? provincialEventFromRow(
       geofenceRadiusMeters: radius > 0 ? radius : 100,
     ),
     status: status,
+    requiresCheckOut: _asBool(row['requires_check_out']),
   );
 }
 
@@ -193,6 +194,7 @@ Map<String, Object?> provincialEventToRow(ProvincialEvent event) {
     'longitude': event.location.longitude,
     'geofence_radius_meters': event.location.geofenceRadiusMeters,
     'status': event.status.name,
+    'requires_check_out': event.requiresCheckOut,
   };
 }
 
@@ -270,6 +272,23 @@ double? _asDouble(Object? value) {
     return value.toDouble();
   }
   return double.tryParse(value?.toString() ?? '');
+}
+
+bool _asBool(Object? value, {bool fallback = false}) {
+  if (value is bool) {
+    return value;
+  }
+  if (value is num) {
+    return value != 0;
+  }
+  final raw = value?.toString().trim().toLowerCase();
+  if (raw == 'true' || raw == '1') {
+    return true;
+  }
+  if (raw == 'false' || raw == '0') {
+    return false;
+  }
+  return fallback;
 }
 
 int? _asInt(Object? value) {
