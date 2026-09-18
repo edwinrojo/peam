@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/app_notification.dart';
+import '../navigation/notification_tap.dart';
 import '../state/session_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/soft_card.dart';
@@ -51,7 +52,8 @@ class NotificationsScreen extends StatelessWidget {
                       final item = items[index];
                       return _NotificationTile(
                         notification: item,
-                        onTap: () => session.markNotificationRead(item.id),
+                        onTap: () =>
+                            openInboxNotification(session: session, item: item),
                       );
                     },
                   ),
@@ -122,6 +124,7 @@ class _NotificationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SoftCard(
+      key: Key('notification-${notification.id}'),
       onTap: onTap,
       padding: const EdgeInsets.all(14),
       child: Row(

@@ -56,6 +56,7 @@ EventNoticeResult reconcileEventNotices({
               '${event.name} is scheduled for ${event.cardDateLabel} at ${event.venue}.',
           kind: NotificationKind.eventPublished,
           createdAt: clock,
+          eventId: event.id,
         ),
       );
     } else if (hasBaseline && previous != fingerprint) {
@@ -67,6 +68,7 @@ EventNoticeResult reconcileEventNotices({
               '${event.name} was updated. Open PEAM for the latest schedule and venue.',
           kind: NotificationKind.eventPublished,
           createdAt: clock,
+          eventId: event.id,
         ),
       );
     }
@@ -101,6 +103,7 @@ AppNotification _reminderNotice(ProvincialEvent event, DateTime createdAt) {
     body: '${event.name} starts at ${event.startTime} at ${event.venue}.',
     kind: NotificationKind.eventReminder,
     createdAt: createdAt,
+    eventId: event.id,
   );
 }
 

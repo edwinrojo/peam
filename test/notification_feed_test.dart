@@ -49,6 +49,7 @@ void main() {
     expect(result.notices.single.kind, NotificationKind.eventPublished);
     expect(result.notices.single.title, 'New event published');
     expect(result.notices.single.body, contains('Coastal Clean-up'));
+    expect(result.notices.single.eventId, extra.id);
   });
 
   test('a venue or schedule change creates an update notice', () {
@@ -102,6 +103,7 @@ void main() {
       ),
       hasLength(1),
     );
+    expect(result.notices.single.eventId, event.id);
     expect(result.remindedEventIds, contains(event.id));
   });
 

@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/sample_data.dart';
+import '../navigation/notification_tap.dart';
 import '../state/session_controller.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_vectors.dart';
 import '../widgets/app_vector.dart';
+import '../widgets/close_app_scope.dart';
 import '../widgets/peam_logo.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/soft_card.dart';
@@ -72,6 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
     Navigator.of(context).pushReplacementNamed(MainShell.routeName);
+    await flushPendingNotificationTap(session);
   }
 
   Future<void> _requestDeviceChange() async {
@@ -98,76 +101,81 @@ class _LoginScreenState extends State<LoginScreen> {
       listenable: session,
       builder: (context, _) {
         final challenge = session.pendingChallenge;
-        return Scaffold(
-          body: SafeArea(
-            child: Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const AppVector(AppVectors.heroAttendance, height: 88),
-                        const SizedBox(height: 8),
-                        const PeamLogo(showWordmark: true, size: 48),
-                        const SizedBox(height: 16),
-                        SoftCard(
-                          padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-                          child: challenge == null
-                              ? _EmployeeIdStep(
-                                  formKey: _formKey,
-                                  employeeIdController: _employeeIdController,
-                                  error: _error,
-                                  showPrototypeHint: !session.isLiveAuth,
-                                  onSubmit: _sendCode,
-                                )
-                              : _CodeStep(
-                                  challenge: challenge,
-                                  codeController: _codeController,
-                                  error: _error,
-                                  showPrototypeHint: !session.isLiveAuth,
-                                  deviceChangeRequired:
-                                      session.deviceChangeRequired,
-                                  onChangeId: () {
-                                    _codeController.clear();
-                                    session.clearLoginChallenge();
-                                    setState(() => _error = null);
-                                  },
-                                  onRequestDeviceChange: _requestDeviceChange,
-                                ),
-                        ),
-                      ],
+        return CloseAppScope(
+          child: Scaffold(
+            body: SafeArea(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const AppVector(
+                            AppVectors.heroAttendance,
+                            height: 88,
+                          ),
+                          const SizedBox(height: 8),
+                          const PeamLogo(showWordmark: true, size: 48),
+                          const SizedBox(height: 16),
+                          SoftCard(
+                            padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                            child: challenge == null
+                                ? _EmployeeIdStep(
+                                    formKey: _formKey,
+                                    employeeIdController: _employeeIdController,
+                                    error: _error,
+                                    showPrototypeHint: !session.isLiveAuth,
+                                    onSubmit: _sendCode,
+                                  )
+                                : _CodeStep(
+                                    challenge: challenge,
+                                    codeController: _codeController,
+                                    error: _error,
+                                    showPrototypeHint: !session.isLiveAuth,
+                                    deviceChangeRequired:
+                                        session.deviceChangeRequired,
+                                    onChangeId: () {
+                                      _codeController.clear();
+                                      session.clearLoginChallenge();
+                                      setState(() => _error = null);
+                                    },
+                                    onRequestDeviceChange: _requestDeviceChange,
+                                  ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
-                  child: PrimaryButton(
-                    key: const Key('login-button'),
-                    label: challenge == null
-                        ? 'Send email code'
-                        : 'Verify and bind this phone',
-                    icon: challenge == null
-                        ? Icons.mail_outline
-                        : Icons.verified_user_outlined,
-                    loading: _busy,
-                    onPressed: _busy
-                        ? null
-                        : challenge == null
-                        ? _sendCode
-                        : _verifyCode,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
+                    child: PrimaryButton(
+                      key: const Key('login-button'),
+                      label: challenge == null
+                          ? 'Send email code'
+                          : 'Verify and bind this phone',
+                      icon: challenge == null
+                          ? Icons.mail_outline
+                          : Icons.verified_user_outlined,
+                      loading: _busy,
+                      onPressed: _busy
+                          ? null
+                          : challenge == null
+                          ? _sendCode
+                          : _verifyCode,
+                    ),
                   ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(24, 0, 24, 16),
-                  child: Text(
-                    'HRMDO creates employee accounts. This phone is bound after the first successful sign-in.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.muted, height: 1.4),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(24, 0, 24, 16),
+                    child: Text(
+                      'HRMDO creates employee accounts. This phone is bound after the first successful sign-in.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.muted, height: 1.4),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );

@@ -20,6 +20,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
+  SessionController? _session;
 
   bool get _searching =>
       _searchFocus.hasFocus || _searchController.text.trim().isNotEmpty;
@@ -32,7 +33,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final session = SessionScope.of(context);
+    _session = session;
+    session.onHomeBack = _onHomeBack;
+  }
+
+  @override
   void dispose() {
+    if (identical(_session?.onHomeBack, _onHomeBack)) {
+      _session?.onHomeBack = null;
+    }
     _searchFocus
       ..removeListener(_rebuildForSearch)
       ..dispose();
@@ -40,6 +52,14 @@ class _HomeScreenState extends State<HomeScreen> {
       ..removeListener(_syncSearchQuery)
       ..dispose();
     super.dispose();
+  }
+
+  bool _onHomeBack() {
+    if (!_searching) {
+      return false;
+    }
+    _closeSearch();
+    return true;
   }
 
   void _rebuildForSearch() {
@@ -78,197 +98,211 @@ class _HomeScreenState extends State<HomeScreen> {
         .where((event) => event.effectiveStatus() == EventStatus.ongoing)
         .length;
 
-    return PopScope(
-      canPop: !searching,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) {
-          _closeSearch();
-        }
-      },
-      child: RefreshIndicator(
-        onRefresh: session.refreshEvents,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (!searching) ...[
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.peach,
-                        borderRadius: BorderRadius.circular(AppRadii.pill),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.star_rounded,
-                            size: 16,
-                            color: AppColors.peachDeep,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            employee?.department.code ?? 'PEAM',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                              color: AppColors.ink,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    _RoundIconButton(
-                      icon: Icons.search_rounded,
-                      onTap: () => _searchFocus.requestFocus(),
-                    ),
-                    const SizedBox(width: 8),
-                    ListenableBuilder(
-                      listenable: session,
-                      builder: (context, _) {
-                        return _NotificationButton(
-                          unreadCount: session.unreadNotificationCount,
-                          onTap: () {
-                            Navigator.of(
-                              context,
-                            ).pushNamed(NotificationsScreen.routeName);
-                          },
-                        );
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 22),
-                Text(
-                  'Good day, ${employee?.firstName ?? 'Employee'}',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.muted,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Attendance Made Simple',
-                  style: TextStyle(
-                    fontSize: 32,
-                    height: 1.1,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
-                    letterSpacing: -0.8,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  employee == null
-                      ? 'Select an official provincial event to check in.'
-                      : 'Device bound to ${employee.deviceName}',
-                  style: const TextStyle(color: AppColors.muted, height: 1.4),
-                ),
-                const SizedBox(height: 14),
-                _OfflineSyncBanner(session: session),
-                const SizedBox(height: 18),
-                const AppVector(AppVectors.heroAttendance, height: 112),
-                const SizedBox(height: 18),
-              ],
+    return RefreshIndicator(
+      onRefresh: session.refreshEvents,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!searching) ...[
               Row(
                 children: [
-                  if (searching)
-                    IconButton(
-                      key: const Key('home-search-back'),
-                      tooltip: 'Close search',
-                      onPressed: _closeSearch,
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        size: 18,
-                      ),
-                    )
-                  else
-                    const SizedBox.shrink(),
-                  Expanded(
-                    child: TextField(
-                      key: const Key('home-search'),
-                      controller: _searchController,
-                      focusNode: _searchFocus,
-                      onChanged: session.updateSearch,
-                      onSubmitted: (_) => _searchFocus.unfocus(),
-                      textInputAction: TextInputAction.search,
-                      decoration: InputDecoration(
-                        hintText: 'Search events or venues',
-                        prefixIcon: const Icon(Icons.search_rounded),
-                        suffixIcon: session.searchQuery.trim().isEmpty
-                            ? null
-                            : IconButton(
-                                key: const Key('home-search-clear'),
-                                tooltip: 'Clear search',
-                                icon: const Icon(Icons.close_rounded),
-                                onPressed: _clearSearch,
-                              ),
-                      ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
                     ),
+                    decoration: BoxDecoration(
+                      color: AppColors.sky,
+                      borderRadius: BorderRadius.circular(AppRadii.pill),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.calendar_today_rounded,
+                          size: 13,
+                          color: AppColors.skyDeep,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _todayLabel(),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  _RoundIconButton(
+                    icon: Icons.search_rounded,
+                    onTap: () => _searchFocus.requestFocus(),
+                  ),
+                  const SizedBox(width: 8),
+                  ListenableBuilder(
+                    listenable: session,
+                    builder: (context, _) {
+                      return _NotificationButton(
+                        unreadCount: session.unreadNotificationCount,
+                        onTap: () {
+                          Navigator.of(
+                            context,
+                          ).pushNamed(NotificationsScreen.routeName);
+                        },
+                      );
+                    },
                   ),
                 ],
               ),
-              if (!searching) ...[
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 86,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      _CategoryTile(
-                        key: const Key('filter-all'),
-                        label: 'All',
-                        asset: AppVectors.categoryAll,
-                        color: AppColors.line,
-                        selected: session.statusFilter == null,
-                        onTap: () => session.updateStatusFilter(null),
-                      ),
-                      _CategoryTile(
-                        key: const Key('filter-ongoing'),
-                        label: 'Ongoing',
-                        asset: AppVectors.categoryOngoing,
-                        color: AppColors.mint,
-                        badge: ongoingCount > 0 ? '$ongoingCount' : null,
-                        selected: session.statusFilter == EventStatus.ongoing,
-                        onTap: () =>
-                            session.updateStatusFilter(EventStatus.ongoing),
-                      ),
-                      _CategoryTile(
-                        key: const Key('filter-upcoming'),
-                        label: 'Upcoming',
-                        asset: AppVectors.categoryUpcoming,
-                        color: AppColors.sky,
-                        selected: session.statusFilter == EventStatus.published,
-                        onTap: () =>
-                            session.updateStatusFilter(EventStatus.published),
-                      ),
-                      _CategoryTile(
-                        key: const Key('filter-done'),
-                        label: 'Done',
-                        asset: AppVectors.categoryDone,
-                        color: AppColors.lavender,
-                        selected: session.statusFilter == EventStatus.completed,
-                        onTap: () =>
-                            session.updateStatusFilter(EventStatus.completed),
-                      ),
-                    ],
+              const SizedBox(height: 22),
+              Text(
+                'Good day, ${employee?.firstName ?? 'Employee'}',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.muted,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Attendance Made Simple',
+                style: TextStyle(
+                  fontSize: 32,
+                  height: 1.1,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.ink,
+                  letterSpacing: -0.8,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                employee == null
+                    ? 'Select an official provincial event to check in.'
+                    : 'Device bound to ${employee.deviceName}',
+                style: const TextStyle(color: AppColors.muted, height: 1.4),
+              ),
+              const SizedBox(height: 14),
+              _OfflineSyncBanner(session: session),
+              const SizedBox(height: 18),
+              const AppVector(AppVectors.heroAttendance, height: 112),
+              const SizedBox(height: 18),
+            ],
+            Row(
+              children: [
+                if (searching)
+                  IconButton(
+                    key: const Key('home-search-back'),
+                    tooltip: 'Close search',
+                    onPressed: _closeSearch,
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 18,
+                    ),
+                  )
+                else
+                  const SizedBox.shrink(),
+                Expanded(
+                  child: TextField(
+                    key: const Key('home-search'),
+                    controller: _searchController,
+                    focusNode: _searchFocus,
+                    onChanged: session.updateSearch,
+                    onSubmitted: (_) => _searchFocus.unfocus(),
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                      hintText: 'Search events or venues',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: session.searchQuery.trim().isEmpty
+                          ? null
+                          : IconButton(
+                              key: const Key('home-search-clear'),
+                              tooltip: 'Clear search',
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: _clearSearch,
+                            ),
+                    ),
                   ),
                 ),
               ],
-              const SizedBox(height: 14),
-              if (searching)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: Text(
+            ),
+            if (!searching) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 86,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _CategoryTile(
+                      key: const Key('filter-all'),
+                      label: 'All',
+                      asset: AppVectors.categoryAll,
+                      color: AppColors.line,
+                      selected: session.statusFilter == null,
+                      onTap: () => session.updateStatusFilter(null),
+                    ),
+                    _CategoryTile(
+                      key: const Key('filter-ongoing'),
+                      label: 'Ongoing',
+                      asset: AppVectors.categoryOngoing,
+                      color: AppColors.mint,
+                      badge: ongoingCount > 0 ? '$ongoingCount' : null,
+                      selected: session.statusFilter == EventStatus.ongoing,
+                      onTap: () =>
+                          session.updateStatusFilter(EventStatus.ongoing),
+                    ),
+                    _CategoryTile(
+                      key: const Key('filter-upcoming'),
+                      label: 'Upcoming',
+                      asset: AppVectors.categoryUpcoming,
+                      color: AppColors.sky,
+                      selected: session.statusFilter == EventStatus.published,
+                      onTap: () =>
+                          session.updateStatusFilter(EventStatus.published),
+                    ),
+                    _CategoryTile(
+                      key: const Key('filter-done'),
+                      label: 'Done',
+                      asset: AppVectors.categoryDone,
+                      color: AppColors.lavender,
+                      selected: session.statusFilter == EventStatus.completed,
+                      onTap: () =>
+                          session.updateStatusFilter(EventStatus.completed),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
+            if (searching)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Text(
+                  '${events.length} found',
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              )
+            else
+              Row(
+                children: [
+                  const Text(
+                    'Official events',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
                     '${events.length} found',
                     style: const TextStyle(
                       color: AppColors.muted,
@@ -276,97 +310,95 @@ class _HomeScreenState extends State<HomeScreen> {
                       fontSize: 13,
                     ),
                   ),
-                )
-              else
-                Row(
-                  children: [
-                    const Text(
-                      'Official events',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '${events.length} found',
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
+                ],
+              ),
+            if (!searching) const SizedBox(height: 14),
+            if (session.eventsError != null) ...[
+              SoftCard(
+                color: AppColors.peach,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
                 ),
-              if (!searching) const SizedBox(height: 14),
-              if (session.eventsError != null) ...[
-                SoftCard(
-                  color: AppColors.peach,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                  child: Text(
-                    session.eventsError!,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                      height: 1.35,
-                      color: AppColors.ink,
-                    ),
+                child: Text(
+                  session.eventsError!,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    height: 1.35,
+                    color: AppColors.ink,
                   ),
                 ),
-                const SizedBox(height: 14),
-              ],
-              if (session.isLoadingEvents && events.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 48),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (events.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 48),
-                  child: Center(
-                    child: Text(
-                      session.searchQuery.trim().isEmpty &&
-                              session.statusFilter == null &&
-                              !searching
-                          ? 'No published events yet.'
-                          : 'No events match your search.',
-                    ),
-                  ),
-                )
-              else
-                ...events.map((event) {
-                  final recorded = session.recordFor(event.id);
-                  final canOpen =
-                      event.needsCheckOut(recorded) || recorded == null;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: EventCard(
-                      key: Key('event-card-${event.id}'),
-                      event: event,
-                      enabled: canOpen,
-                      actionLabel: _eventActionLabel(event, recorded),
-                      onTap: canOpen
-                          ? () {
-                              session.selectEvent(event);
-                              Navigator.of(context).pushNamed(
-                                CheckInScreen.routeName,
-                                arguments: event,
-                              );
-                            }
-                          : null,
-                    ),
-                  );
-                }),
+              ),
+              const SizedBox(height: 14),
             ],
-          ),
+            if (session.isLoadingEvents && events.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 48),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (events.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 48),
+                child: Center(
+                  child: Text(
+                    session.searchQuery.trim().isEmpty &&
+                            session.statusFilter == null &&
+                            !searching
+                        ? 'No published events yet.'
+                        : 'No events match your search.',
+                  ),
+                ),
+              )
+            else
+              ...events.map((event) {
+                final recorded = session.recordFor(event.id);
+                final canOpen =
+                    event.needsCheckOut(recorded) || recorded == null;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: EventCard(
+                    key: Key('event-card-${event.id}'),
+                    event: event,
+                    enabled: canOpen,
+                    actionLabel: _eventActionLabel(event, recorded),
+                    onTap: canOpen
+                        ? () {
+                            session.selectEvent(event);
+                            Navigator.of(context).pushNamed(
+                              CheckInScreen.routeName,
+                              arguments: event,
+                            );
+                          }
+                        : null,
+                  ),
+                );
+              }),
+          ],
         ),
       ),
     );
   }
+}
+
+String _todayLabel([DateTime? now]) {
+  final clock = now ?? DateTime.now();
+  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${weekdays[clock.weekday - 1]}, ${months[clock.month - 1]} ${clock.day}';
 }
 
 String _eventActionLabel(ProvincialEvent event, AttendanceRecord? recorded) {

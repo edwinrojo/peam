@@ -9,6 +9,7 @@ abstract final class SampleNotifications {
           'Provincial Employees Assembly 2026 is now open for check-in at the Capitol Grounds.',
       kind: NotificationKind.eventPublished,
       createdAt: DateTime(2026, 8, 25, 7, 15),
+      eventId: 'evt-assembly',
     ),
     AppNotification(
       id: 'n-reminder-health',
@@ -18,6 +19,7 @@ abstract final class SampleNotifications {
       kind: NotificationKind.eventReminder,
       createdAt: DateTime(2026, 8, 24, 16, 40),
       isRead: true,
+      eventId: 'evt-health',
     ),
     AppNotification(
       id: 'n-device-approved',

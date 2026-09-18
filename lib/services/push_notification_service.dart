@@ -14,6 +14,8 @@ class PushNotificationService {
 
   bool _ready = false;
   int _nextId = 1000;
+  String? _pendingPayload;
+  void Function(String payload)? onTap;
 
   bool get isReady => _ready;
 
@@ -43,7 +45,12 @@ class PushNotificationService {
         macOS: darwin,
       );
 
-      await _plugin.initialize(settings: settings);
+      await _plugin.initialize(
+        settings: settings,
+        onDidReceiveNotificationResponse: (response) {
+          _deliver(response.payload);
+        },
+      );
 
       final androidPlugin = _plugin
           .resolvePlatformSpecificImplementation<
@@ -61,13 +68,24 @@ class PushNotificationService {
         sound: true,
       );
 
+      try {
+        final launch = await _plugin.getNotificationAppLaunchDetails();
+        if (launch?.didNotificationLaunchApp == true) {
+          _deliver(launch?.notificationResponse?.payload);
+        }
+      } catch (_) {}
+
       _ready = true;
     } catch (_) {
       _ready = false;
     }
   }
 
-  Future<void> showBanner({required String title, required String body}) async {
+  Future<void> showBanner({
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
     if (!_ready) {
       return;
     }
@@ -76,6 +94,7 @@ class PushNotificationService {
       title: title,
       body: body,
       notificationDetails: _details,
+      payload: payload,
     );
   }
 
@@ -84,6 +103,7 @@ class PushNotificationService {
     required String title,
     required String body,
     required DateTime when,
+    String? payload,
   }) async {
     if (!_ready || !when.isAfter(DateTime.now())) {
       return;
@@ -95,6 +115,7 @@ class PushNotificationService {
       scheduledDate: tz.TZDateTime.from(when, tz.local),
       notificationDetails: _details,
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      payload: payload,
     );
   }
 
@@ -103,6 +124,24 @@ class PushNotificationService {
       return;
     }
     await _plugin.cancel(id: id);
+  }
+
+  String? takePendingPayload() {
+    final value = _pendingPayload;
+    _pendingPayload = null;
+    return value;
+  }
+
+  void _deliver(String? payload) {
+    if (payload == null || payload.isEmpty) {
+      return;
+    }
+    final handler = onTap;
+    if (handler != null) {
+      handler(payload);
+      return;
+    }
+    _pendingPayload = payload;
   }
 
   static const _details = NotificationDetails(

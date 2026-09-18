@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import 'navigation/notification_tap.dart';
 import 'screens/biometric_screen.dart';
 import 'screens/check_in_screen.dart';
 import 'screens/confirmation_screen.dart';
@@ -53,14 +56,23 @@ class _PeamAppState extends State<PeamApp> {
   @override
   void initState() {
     super.initState();
+    _session.listenForOsNotificationTaps(_onOsNotificationTap);
     _restore();
+  }
+
+  void _onOsNotificationTap(String payload) {
+    unawaited(openNotificationPayload(session: _session, payload: payload));
   }
 
   Future<void> _restore() async {
     await _session.restoreSession();
-    if (mounted) {
-      setState(() => _ready = true);
+    if (!mounted) {
+      return;
     }
+    setState(() => _ready = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(flushPendingNotificationTap(_session));
+    });
   }
 
   @override
@@ -81,6 +93,7 @@ class _PeamAppState extends State<PeamApp> {
           service: _locationService,
           child: MaterialApp(
             title: 'PEAM-Registry',
+            navigatorKey: _session.navigatorKey,
             debugShowCheckedModeBanner: false,
             theme: AppTheme.light(),
             home: !_ready

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../data/sample_data.dart';
 import '../models/app_notification.dart';
@@ -43,9 +44,11 @@ class SessionController extends ChangeNotifier {
     EmployeeAuthApi? liveAuth,
     EventsCatalog? eventsCatalog,
     NotificationInbox? notificationInbox,
+    GlobalKey<NavigatorState>? navigatorKey,
     this._liveNotifications,
     this._prototypeEmailCode = SampleData.prototypeEmailCode,
-  }) : _remoteAuth = liveAuth,
+  }) : navigatorKey = navigatorKey ?? GlobalKey<NavigatorState>(),
+       _remoteAuth = liveAuth,
        _eventsCatalog = eventsCatalog,
        _events = eventsCatalog == null ? List.of(SampleData.events) : const [],
        _push =
@@ -75,6 +78,7 @@ class SessionController extends ChangeNotifier {
   final LiveNotificationSource? _liveNotifications;
   final String _prototypeEmailCode;
   final bool _ownsConnectivity;
+  final GlobalKey<NavigatorState> navigatorKey;
 
   late List<Employee> _accounts;
   List<ProvincialEvent> _events;
@@ -96,8 +100,10 @@ class SessionController extends ChangeNotifier {
   String? eventsError;
   GeofenceCheck? stagedGeofence;
   AttendanceAction pendingAttendanceAction = AttendanceAction.checkIn;
+  int shellTab = 0;
   bool _disposed = false;
   Future<int>? _syncInFlight;
+  String? _heldNotificationPayload;
 
   List<Employee> get accounts => List.unmodifiable(_accounts);
   List<AttendanceRecord> get history => List.unmodifiable(_history);
@@ -116,6 +122,41 @@ class SessionController extends ChangeNotifier {
     }
     return null;
   }
+
+  ProvincialEvent? eventById(String id) {
+    for (final event in _events) {
+      if (event.id == id) {
+        return event;
+      }
+    }
+    return null;
+  }
+
+  void selectShellTab(int index) {
+    final next = index.clamp(0, 2);
+    if (shellTab == next) {
+      return;
+    }
+    shellTab = next;
+    notifyListeners();
+  }
+
+  void holdNotificationPayload(String payload) {
+    _heldNotificationPayload = payload;
+  }
+
+  String? consumePendingOsPayload() {
+    final held = _heldNotificationPayload;
+    _heldNotificationPayload = null;
+    return held ?? _push.takePendingPayload();
+  }
+
+  void listenForOsNotificationTaps(void Function(String payload) onTap) {
+    _push.onTap = onTap;
+  }
+
+  /// Home registers this so a root back can close search before exit.
+  bool Function()? onHomeBack;
 
   List<ProvincialEvent> get visibleEvents => eventsMatching();
 
@@ -439,6 +480,9 @@ class SessionController extends ChangeNotifier {
     statusFilter = null;
     eventsError = null;
     stagedGeofence = null;
+    shellTab = 0;
+    _heldNotificationPayload = null;
+    onHomeBack = null;
     if (_eventsCatalog != null) {
       _events = const [];
     }
@@ -595,6 +639,7 @@ class SessionController extends ChangeNotifier {
           ? 'Your check-in for ${event.name} is saved on this device and will sync when connectivity returns.'
           : 'Your check-in for ${event.name} is saved on this phone and will upload to PEAM.',
       kind: NotificationKind.attendanceSync,
+      eventId: event.id,
       showSystemBanner: true,
     );
     try {
@@ -667,6 +712,7 @@ class SessionController extends ChangeNotifier {
           ? 'Your check-out for ${event.name} is saved on this device and will sync when connectivity returns.'
           : 'Your check-out for ${event.name} is saved on this phone and will upload to PEAM.',
       kind: NotificationKind.attendanceSync,
+      eventId: event.id,
       showSystemBanner: true,
     );
     try {
@@ -793,6 +839,7 @@ class SessionController extends ChangeNotifier {
     required String title,
     required String body,
     required NotificationKind kind,
+    String? eventId,
     bool showSystemBanner = false,
   }) async {
     final item = AppNotification(
@@ -801,6 +848,7 @@ class SessionController extends ChangeNotifier {
       body: body,
       kind: kind,
       createdAt: DateTime.now(),
+      eventId: eventId,
     );
     await _prependNotices([item], showBanner: showSystemBanner);
   }
@@ -866,6 +914,7 @@ class SessionController extends ChangeNotifier {
         title: notice.title,
         body: notice.body,
         when: reminder.when,
+        payload: notice.tapPayload.encode(),
       );
     }
     await _prependNotices(result.notices);
@@ -911,7 +960,11 @@ class SessionController extends ChangeNotifier {
       return;
     }
     for (final item in fresh) {
-      await _push.showBanner(title: item.title, body: item.body);
+      await _push.showBanner(
+        title: item.title,
+        body: item.body,
+        payload: item.tapPayload.encode(),
+      );
     }
   }
 
@@ -970,6 +1023,7 @@ class SessionController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    onHomeBack = null;
     unawaited(_liveNotifications?.stop());
     _connectivity.removeListener(_onConnectivityChanged);
     if (_ownsConnectivity) {

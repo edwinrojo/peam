@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:peam/app.dart';
 import 'package:peam/data/sample_data.dart';
+import 'package:peam/models/app_notification.dart';
+import 'package:peam/navigation/notification_tap.dart';
 import 'package:peam/services/attendance_stores.dart';
 import 'package:peam/services/auth_session_store.dart';
 import 'package:peam/services/biometric_auth_service.dart';
@@ -328,6 +330,39 @@ void main() {
     expect(find.textContaining('simulate a drop'), findsNothing);
   });
 
+  testWidgets('root back asks before closing the app', (tester) async {
+    await _openApp(tester);
+    await _loginAsDemo(tester);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Close PEAM?'), findsOneWidget);
+    expect(find.text('Official events'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('close-app-cancel')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Close PEAM?'), findsNothing);
+    expect(find.text('Official events'), findsOneWidget);
+  });
+
+  testWidgets('system back closes home search before asking to exit', (
+    tester,
+  ) async {
+    await _openApp(tester);
+    await _loginAsDemo(tester);
+
+    await tester.tap(find.byKey(const Key('home-search')));
+    await tester.pump();
+
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+
+    expect(find.text('Close PEAM?'), findsNothing);
+    expect(find.text('Attendance Made Simple'), findsOneWidget);
+  });
+
   testWidgets('notifications list real notices and has no simulate control', (
     tester,
   ) async {
@@ -341,6 +376,123 @@ void main() {
     expect(find.text('No notifications yet'), findsOneWidget);
     expect(find.byKey(const Key('simulate-push-button')), findsNothing);
     expect(find.text('Simulate push'), findsNothing);
+  });
+
+  testWidgets('tapping an event notice opens check-in', (tester) async {
+    final session = SessionController(
+      pushNotifications: PushNotificationService(enableSystemBanners: false),
+    );
+    addTearDown(session.dispose);
+    final error = await session.completePrototypeLogin(
+      SampleData.demoEmployee.employeeNumber,
+    );
+    expect(error, isNull);
+    await session.addNotification(
+      title: 'New event published',
+      body: 'Provincial Employees Assembly 2026 is scheduled at the Capitol.',
+      kind: NotificationKind.eventPublished,
+      eventId: 'evt-assembly',
+    );
+
+    await tester.pumpWidget(PeamApp(session: session));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('notifications-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('New event published'), findsOneWidget);
+    await tester.tap(find.text('New event published'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Check in'), findsOneWidget);
+    expect(find.text('Provincial Employees Assembly 2026'), findsOneWidget);
+    expect(session.unreadNotificationCount, 0);
+  });
+
+  testWidgets('tapping an attendance notice opens history', (tester) async {
+    final session = SessionController(
+      pushNotifications: PushNotificationService(enableSystemBanners: false),
+    );
+    addTearDown(session.dispose);
+    final error = await session.completePrototypeLogin(
+      SampleData.demoEmployee.employeeNumber,
+    );
+    expect(error, isNull);
+    await session.addNotification(
+      title: 'Attendance synced',
+      body: '1 pending attendance record was uploaded to PEAM.',
+      kind: NotificationKind.attendanceSync,
+      eventId: 'evt-assembly',
+    );
+
+    await tester.pumpWidget(PeamApp(session: session));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('notifications-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Attendance synced'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Attendance history'), findsOneWidget);
+    expect(session.shellTab, 1);
+  });
+
+  testWidgets('tapping a device-change notice opens profile', (tester) async {
+    final session = SessionController(
+      pushNotifications: PushNotificationService(enableSystemBanners: false),
+    );
+    addTearDown(session.dispose);
+    final error = await session.completePrototypeLogin(
+      SampleData.demoEmployee.employeeNumber,
+    );
+    expect(error, isNull);
+    await session.addNotification(
+      title: 'Device-change request approved',
+      body: 'HRMDO approved your request. You can use the new phone.',
+      kind: NotificationKind.deviceChangeUpdate,
+    );
+
+    await tester.pumpWidget(PeamApp(session: session));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('notifications-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Device-change request approved'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Profile'), findsWidgets);
+    expect(find.text(SampleData.demoEmployee.fullName), findsOneWidget);
+    expect(find.text('Binding'), findsOneWidget);
+    expect(session.shellTab, 2);
+  });
+
+  testWidgets('an OS notification payload opens the event check-in', (
+    tester,
+  ) async {
+    final session = SessionController(
+      pushNotifications: PushNotificationService(enableSystemBanners: false),
+    );
+    addTearDown(session.dispose);
+    final error = await session.completePrototypeLogin(
+      SampleData.demoEmployee.employeeNumber,
+    );
+    expect(error, isNull);
+
+    await tester.pumpWidget(PeamApp(session: session));
+    await tester.pumpAndSettle();
+
+    await openNotificationPayload(
+      session: session,
+      payload: NotificationPayload(
+        kind: NotificationKind.eventReminder,
+        eventId: 'evt-assembly',
+        notificationId: 'event-reminder-evt-assembly',
+      ).encode(),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Check in'), findsOneWidget);
+    expect(find.text('Provincial Employees Assembly 2026'), findsOneWidget);
   });
 }
 
