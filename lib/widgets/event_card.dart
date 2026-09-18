@@ -53,63 +53,66 @@ class EventCard extends StatelessWidget {
       opacity: enabled ? 1 : 0.55,
       child: SoftCard(
         onTap: enabled ? onTap : null,
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  width: 52,
-                  height: 52,
-                  padding: const EdgeInsets.all(6),
+                  width: 40,
+                  height: 40,
+                  padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     color: _accent,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: AppVector(_badgeAsset, width: 40, height: 40),
+                  child: AppVector(_badgeAsset, width: 32, height: 32),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         event.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: AppColors.ink,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         event.venue,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           color: AppColors.muted,
                         ),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
                 _StatusChip(event: event, color: _accentDeep, fill: _accent),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
             Text(
               event.description,
-              maxLines: 2,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 13,
-                height: 1.4,
+                fontSize: 12,
+                height: 1.3,
                 color: AppColors.muted,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -121,13 +124,13 @@ class EventCard extends StatelessWidget {
                         icon: Icons.calendar_today_outlined,
                         label: event.cardDateLabel,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 4),
                       _Meta(
                         icon: Icons.schedule_outlined,
                         label: event.scheduleLabel,
                       ),
                       if (event.requiresCheckOut) ...[
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 4),
                         const _Meta(
                           icon: Icons.logout_rounded,
                           label: 'Check-out required',
@@ -136,7 +139,7 @@ class EventCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 _ActionBadge(label: actionLabel),
               ],
             ),
@@ -161,7 +164,7 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: fill,
         borderRadius: BorderRadius.circular(AppRadii.pill),
@@ -170,7 +173,7 @@ class _StatusChip extends StatelessWidget {
         event.statusLabel,
         style: TextStyle(
           color: color,
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -222,7 +225,7 @@ class _ActionBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = _style;
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
+      padding: const EdgeInsets.fromLTRB(8, 6, 10, 6),
       decoration: BoxDecoration(
         color: style.fill,
         borderRadius: BorderRadius.circular(AppRadii.pill),
@@ -230,14 +233,14 @@ class _ActionBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(style.icon, size: 15, color: style.foreground),
-          const SizedBox(width: 6),
+          Icon(style.icon, size: 14, color: style.foreground),
+          const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
               color: style.foreground,
               fontWeight: FontWeight.w800,
-              fontSize: 12,
+              fontSize: 11,
             ),
           ),
         ],
@@ -256,13 +259,13 @@ class _Meta extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 15, color: AppColors.muted),
-        const SizedBox(width: 5),
+        Icon(icon, size: 13, color: AppColors.muted),
+        const SizedBox(width: 4),
         Expanded(
           child: Text(
             label,
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               color: AppColors.muted,
               fontWeight: FontWeight.w500,
             ),

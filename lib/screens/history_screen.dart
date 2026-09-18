@@ -45,7 +45,7 @@ class HistoryScreen extends StatelessWidget {
               else
                 ...records.map(
                   (record) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.only(bottom: 8),
                     child: _HistoryCard(record: record),
                   ),
                 ),
@@ -202,62 +202,66 @@ class _HistoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return SoftCard(
       key: Key('history-${record.event.id}'),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const AppVector(AppVectors.ticketPass, width: 48, height: 48),
-          const SizedBox(width: 12),
+          const AppVector(AppVectors.ticketPass, width: 36, height: 36),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   record.event.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
-                    fontSize: 16,
+                    fontSize: 14,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   record.event.venue,
-                  style: const TextStyle(color: AppColors.muted),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.muted, fontSize: 12),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   'Check-in  ${_format(record.checkInAt)}',
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     color: AppColors.ink,
-                    fontSize: 13,
+                    fontSize: 12,
                   ),
                 ),
                 if (record.checkOutAt != null) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     'Check-out  ${_format(record.checkOutAt!)}',
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       color: AppColors.ink,
-                      fontSize: 13,
+                      fontSize: 12,
                     ),
                   ),
                 ] else if (record.event.requiresCheckOut) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   const Text(
                     'Check-out required',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       color: AppColors.peachDeep,
-                      fontSize: 13,
+                      fontSize: 12,
                     ),
                   ),
                 ],
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
+                  spacing: 6,
+                  runSpacing: 4,
                   children: [
                     _Chip(
                       label: _status(record),
@@ -364,7 +368,7 @@ class _Chip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: fill,
         borderRadius: BorderRadius.circular(AppRadii.pill),
@@ -373,7 +377,7 @@ class _Chip extends StatelessWidget {
         label,
         style: TextStyle(
           color: color,
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: FontWeight.w700,
         ),
       ),

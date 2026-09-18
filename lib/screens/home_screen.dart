@@ -218,9 +218,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               if (!searching) ...[
-                const SizedBox(height: 18),
+                const SizedBox(height: 12),
                 SizedBox(
-                  height: 118,
+                  height: 86,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     children: [
@@ -264,7 +264,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ],
-              const SizedBox(height: 22),
+              const SizedBox(height: 14),
               if (searching)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 14),
@@ -343,7 +343,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   final canOpen =
                       event.needsCheckOut(recorded) || recorded == null;
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.only(bottom: 10),
                     child: EventCard(
                       key: Key('event-card-${event.id}'),
                       event: event,
@@ -403,19 +403,19 @@ class _CategoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(right: 12),
+      padding: const EdgeInsets.only(right: 8),
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          width: 92,
-          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+          width: 76,
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: selected ? AppColors.ink : Colors.transparent,
-              width: 1.6,
+              width: 1.4,
             ),
             boxShadow: AppShadows.lighter,
           ),
@@ -425,13 +425,13 @@ class _CategoryTile extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppVector(asset, width: 42, height: 42),
+                  AppVector(asset, width: 32, height: 32),
                   const Spacer(),
                   Text(
                     label,
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
-                      fontSize: 13,
+                      fontSize: 11,
                       color: AppColors.ink,
                     ),
                   ),
@@ -439,12 +439,12 @@ class _CategoryTile extends StatelessWidget {
               ),
               if (badge != null)
                 Positioned(
-                  top: -6,
-                  right: -4,
+                  top: -4,
+                  right: -2,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
+                      horizontal: 5,
+                      vertical: 2,
                     ),
                     decoration: const BoxDecoration(
                       color: AppColors.button,
