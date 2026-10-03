@@ -174,6 +174,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Outside the event area'), findsOneWidget);
+    expect(
+      find.text(
+        'Move inside the 120 m geofence, then recheck your location.',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Recheck location'), findsOneWidget);
     expect(find.text('Verify it is you'), findsNothing);
 

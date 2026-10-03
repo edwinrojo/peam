@@ -228,6 +228,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
                                       ? (checkingOut
                                             ? 'Check-out is not available for this event.'
                                             : 'Check-in closed at ${event.endTime}. This event has ended.')
+                                      : !inside && check != null
+                                      ? _moveInsideMessage(event)
                                       : event.venue,
                                   style: const TextStyle(
                                     color: AppColors.muted,
@@ -414,10 +416,15 @@ class _CheckInScreenState extends State<CheckInScreen> {
     if (check.isInside) {
       return 'You are ${check.distanceLabel} from the venue and inside the permitted area.';
     }
+    final moveInside = _moveInsideMessage(event);
     if (check.isFarFromVenue) {
-      return 'Your device GPS is ${check.distanceLabel} from this venue (${check.position.coordinateLabel}). The map is zoomed to the event, so that is not your pin. On an emulator, set the simulated location to ${event.location.latitude.toStringAsFixed(4)}, ${event.location.longitude.toStringAsFixed(4)}, then recheck.';
+      return '$moveInside Your device GPS is ${check.distanceLabel} from this venue (${check.position.coordinateLabel}). On an emulator, set the simulated location to ${event.location.latitude.toStringAsFixed(4)}, ${event.location.longitude.toStringAsFixed(4)}.';
     }
-    return 'You are ${check.distanceLabel} from the venue. Move inside the ${check.radiusMeters} m geofence, then recheck.';
+    return 'You are ${check.distanceLabel} from the venue. $moveInside';
+  }
+
+  String _moveInsideMessage(ProvincialEvent event) {
+    return 'Move inside the ${event.location.geofenceRadiusMeters} m geofence, then recheck your location.';
   }
 }
 

@@ -190,9 +190,7 @@ class _GoogleGeofenceMapState extends State<_GoogleGeofenceMap> {
               child: Text(
                 widget.check!.isInside
                     ? 'Inside geofence · ${widget.check!.distanceLabel}'
-                    : widget.check!.isFarFromVenue
-                    ? 'GPS is ${widget.check!.distanceLabel} away · ${widget.check!.position.coordinateLabel}'
-                    : 'Outside geofence · ${widget.check!.distanceLabel} away',
+                    : 'Move inside the ${widget.event.location.geofenceRadiusMeters} m geofence',
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -277,7 +275,7 @@ class _FallbackGeofenceMap extends StatelessWidget {
                         ? 'Finding your location…'
                         : inside
                         ? 'Inside geofence · ${event.location.geofenceRadiusMeters} m radius'
-                        : 'Outside geofence · ${event.location.geofenceRadiusMeters} m radius',
+                        : 'Move inside the ${event.location.geofenceRadiusMeters} m geofence',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
