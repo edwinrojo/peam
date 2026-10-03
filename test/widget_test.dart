@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:peam/app.dart';
 import 'package:peam/data/sample_data.dart';
@@ -20,9 +21,30 @@ void main() {
 
     expect(find.text('Sign in'), findsOneWidget);
     expect(find.text('Employee ID'), findsOneWidget);
+    expect(find.textContaining('Demo'), findsOneWidget);
+    expect(find.text('1234'), findsOneWidget);
     expect(find.byKey(const Key('login-button')), findsOneWidget);
     expect(find.byKey(const Key('register-link')), findsNothing);
     expect(find.text('Password'), findsNothing);
+  });
+
+  testWidgets('a configured Supabase project hides the demo login hint', (
+    tester,
+  ) async {
+    dotenv.loadFromString(
+      envString: '''
+SUPABASE_URL=https://example.supabase.co
+SUPABASE_ANON_KEY=sb_publishable_test_key
+''',
+    );
+    addTearDown(dotenv.clean);
+
+    await _openApp(tester);
+
+    expect(find.text('Employee ID'), findsOneWidget);
+    expect(find.textContaining('Demo'), findsNothing);
+    expect(find.textContaining('123456'), findsNothing);
+    expect(find.text('1234'), findsNothing);
   });
 
   testWidgets('login validates empty employee id', (tester) async {
@@ -49,7 +71,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       find.text(
-        'This Employee ID is not on file. Ask HRMDO to create your account.',
+        'This Employee ID is not on file. Ask PHRMO to create your account.',
       ),
       findsOneWidget,
     );
@@ -454,7 +476,7 @@ void main() {
     expect(error, isNull);
     await session.addNotification(
       title: 'Device-change request approved',
-      body: 'HRMDO approved your request. You can use the new phone.',
+      body: 'PHRMO approved your request. You can use the new phone.',
       kind: NotificationKind.deviceChangeUpdate,
     );
 

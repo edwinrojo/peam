@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../models/models.dart';
 import 'client_ids.dart';
 
 class PersistedAuthSession {
@@ -38,6 +39,10 @@ abstract class AuthSessionStore {
     required String deviceUid,
   });
 
+  Future<Employee?> readEmployee();
+
+  Future<void> saveEmployee(Employee employee);
+
   Future<void> clearSession();
 
   Future<String?> bindingFor(String employeeNumber);
@@ -58,6 +63,7 @@ class MemoryAuthSessionStore implements AuthSessionStore {
 
   final String _deviceUid;
   PersistedAuthSession? _session;
+  Employee? _employee;
   final Map<String, String> _bindings = {};
   final Map<String, PendingDeviceChange> _pendingChanges = {};
 
@@ -79,8 +85,17 @@ class MemoryAuthSessionStore implements AuthSessionStore {
   }
 
   @override
+  Future<Employee?> readEmployee() async => _employee;
+
+  @override
+  Future<void> saveEmployee(Employee employee) async {
+    _employee = employee;
+  }
+
+  @override
   Future<void> clearSession() async {
     _session = null;
+    _employee = null;
   }
 
   @override
@@ -154,6 +169,18 @@ class FileAuthSessionStore implements AuthSessionStore {
         sessionEmployeeNumber: employeeNumber,
       ),
     );
+  }
+
+  @override
+  Future<Employee?> readEmployee() async {
+    final snapshot = await _load();
+    return snapshot.employee;
+  }
+
+  @override
+  Future<void> saveEmployee(Employee employee) async {
+    final snapshot = await _load();
+    await _write(snapshot.copyWith(employee: employee));
   }
 
   @override
@@ -233,18 +260,21 @@ class _AuthSnapshot {
   const _AuthSnapshot({
     this.deviceUid = '',
     this.sessionEmployeeNumber,
+    this.employee,
     this.bindings = const {},
     this.pending = const {},
   });
 
   final String deviceUid;
   final String? sessionEmployeeNumber;
+  final Employee? employee;
   final Map<String, String> bindings;
   final Map<String, PendingDeviceChange> pending;
 
   _AuthSnapshot copyWith({
     String? deviceUid,
     String? sessionEmployeeNumber,
+    Employee? employee,
     Map<String, String>? bindings,
     Map<String, PendingDeviceChange>? pending,
     bool clearSession = false,
@@ -254,6 +284,7 @@ class _AuthSnapshot {
       sessionEmployeeNumber: clearSession
           ? null
           : (sessionEmployeeNumber ?? this.sessionEmployeeNumber),
+      employee: clearSession ? null : (employee ?? this.employee),
       bindings: bindings ?? this.bindings,
       pending: pending ?? this.pending,
     );
@@ -263,6 +294,7 @@ class _AuthSnapshot {
     return {
       'deviceUid': deviceUid,
       'sessionEmployeeNumber': sessionEmployeeNumber,
+      'employee': employee?.toJson(),
       'bindings': bindings,
       'pendingDeviceChanges': [
         for (final request in pending.values)
@@ -304,9 +336,13 @@ class _AuthSnapshot {
         );
       }
     }
+    final rawEmployee = json['employee'];
     return _AuthSnapshot(
       deviceUid: json['deviceUid'] as String? ?? '',
       sessionEmployeeNumber: json['sessionEmployeeNumber'] as String?,
+      employee: rawEmployee is Map
+          ? Employee.fromJson(Map<String, dynamic>.from(rawEmployee))
+          : null,
       bindings: bindings,
       pending: pending,
     );

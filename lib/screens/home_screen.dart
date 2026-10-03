@@ -403,7 +403,11 @@ String _todayLabel([DateTime? now]) {
 
 String _eventActionLabel(ProvincialEvent event, AttendanceRecord? recorded) {
   if (recorded == null) {
-    return event.allowsCheckIn() ? 'Check-in' : 'Ended';
+    return event.isBeforeStart()
+        ? 'Not started'
+        : event.allowsCheckIn()
+        ? 'Check-in'
+        : 'Ended';
   }
   if (event.needsCheckOut(recorded)) {
     return 'Check out';

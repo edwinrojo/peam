@@ -39,9 +39,6 @@ class GeofenceCheck {
   int get distanceRounded => distanceMeters.round();
 
   String get distanceLabel => formatDistance(distanceMeters);
-
-  /// Typical Android emulator GPS is thousands of kilometres from Davao.
-  bool get isFarFromVenue => distanceMeters >= 5000;
 }
 
 GeofenceCheck checkGeofence({

@@ -87,7 +87,8 @@ class _BiometricScreenState extends State<BiometricScreen> {
         _scanning = false;
         _error = checkingOut
             ? 'Check-out is not available for this event.'
-            : 'Check-in closed. This event has ended.';
+            : event?.checkInClosedDetail ??
+                  'Check-in is not available for this event.';
       });
       return;
     }

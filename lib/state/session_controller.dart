@@ -225,27 +225,27 @@ class SessionController extends ChangeNotifier {
     await _applyStoredBindings();
     final deviceUid = await _authStore.deviceUid();
     if (_remoteAuth != null) {
-      final restored = await _remoteAuth.restore(deviceUid: deviceUid);
-      if (restored == null) {
-        await _authStore.clearSession();
+      final cached = await _cachedEmployee(deviceUid);
+      if (cached != null) {
+        await _enterOfflineSession(cached);
+        unawaited(_refreshRemoteSession(deviceUid));
         return;
       }
-      employee = restored;
-      await _authStore.saveBinding(
-        employeeNumber: restored.employeeNumber,
-        deviceUid: deviceUid,
-      );
-      await _authStore.saveSession(
-        employeeNumber: restored.employeeNumber,
-        deviceUid: deviceUid,
-      );
-      await _loadInbox();
-      await _reloadHistory();
-      await refreshEvents();
-      await _syncWhenOnline();
-      await _scheduleBackgroundSyncIfNeeded();
-      await _startLiveNotices();
-      await _startFcm();
+      try {
+        final restored = await _remoteAuth
+            .restore(deviceUid: deviceUid)
+            .timeout(const Duration(seconds: 8));
+        if (restored == null) {
+          return;
+        }
+        await _rememberEmployee(restored, deviceUid);
+        await _enterOfflineSession(restored);
+        unawaited(_refreshRemoteSession(deviceUid, skipRestore: true));
+      } on AuthBindingException {
+        await _authStore.clearSession();
+      } catch (error) {
+        debugPrint('PEAM session restore skipped: $error');
+      }
       return;
     }
     final session = await _authStore.readSession();
@@ -311,12 +311,12 @@ class SessionController extends ChangeNotifier {
     final account = _accountFor(employeeNumber);
     if (account == null) {
       notifyListeners();
-      return 'This Employee ID is not on file. Ask HRMDO to create your account.';
+      return 'This Employee ID is not on file. Ask PHRMO to create your account.';
     }
     final email = account.workEmail;
     if (!account.hasWorkEmail) {
       notifyListeners();
-      return 'This account has no work email on file. Ask HRMDO to add one.';
+      return 'This account has no work email on file. Ask PHRMO to add one.';
     }
     pendingChallenge = LoginChallenge(
       employeeNumber: account.employeeNumber,
@@ -358,7 +358,7 @@ class SessionController extends ChangeNotifier {
 
     final account = _accountFor(challenge.employeeNumber);
     if (account == null) {
-      return 'This Employee ID is not on file. Ask HRMDO to create your account.';
+      return 'This Employee ID is not on file. Ask PHRMO to create your account.';
     }
 
     final deviceUid = await _authStore.deviceUid();
@@ -391,6 +391,7 @@ class SessionController extends ChangeNotifier {
       employeeNumber: bound.employeeNumber,
       deviceUid: deviceUid,
     );
+    await _authStore.saveEmployee(bound);
     await _loadInbox();
     await _reloadHistory();
     await refreshEvents();
@@ -438,7 +439,7 @@ class SessionController extends ChangeNotifier {
       await addNotification(
         title: 'Device-change request sent',
         body:
-            'HRMDO will review the request to bind this phone. You can use PEAM on this device after approval.',
+            'PHRMO will review the request to bind this phone. You can use PEAM on this device after approval.',
         kind: NotificationKind.deviceChangeUpdate,
       );
       return null;
@@ -460,7 +461,7 @@ class SessionController extends ChangeNotifier {
     await addNotification(
       title: 'Device-change request sent',
       body:
-          'HRMDO will review the request to bind this phone. You can use PEAM on this device after approval.',
+          'PHRMO will review the request to bind this phone. You can use PEAM on this device after approval.',
       kind: NotificationKind.deviceChangeUpdate,
     );
     return null;
@@ -996,7 +997,114 @@ class SessionController extends ChangeNotifier {
     return 500000 + (eventId.hashCode.abs() % 400000);
   }
 
-  Future<void> _reloadHistory() async {
+  Future<Employee?> _cachedEmployee(String deviceUid) async {
+    final session = await _authStore.readSession();
+    if (session == null || session.deviceUid != deviceUid) {
+      return null;
+    }
+    final boundUid = await _authStore.bindingFor(session.employeeNumber);
+    if (boundUid != null && boundUid != deviceUid) {
+      return null;
+    }
+    final saved = await _authStore.readEmployee();
+    if (saved != null &&
+        saved.employeeNumber.toLowerCase() ==
+            session.employeeNumber.toLowerCase()) {
+      return saved.copyWith(
+        deviceUid: deviceUid,
+        deviceName: _describeThisPhone(),
+      );
+    }
+    final stub = Employee(
+      employeeNumber: session.employeeNumber,
+      fullName: session.employeeNumber,
+      department: const Department(name: 'Saved on this phone', code: '—'),
+      deviceUid: deviceUid,
+      deviceName: _describeThisPhone(),
+    );
+    final history = await _local.listForEmployee(stub);
+    if (history.isEmpty) {
+      return stub;
+    }
+    return history.first.employee.copyWith(
+      deviceUid: deviceUid,
+      deviceName: _describeThisPhone(),
+    );
+  }
+
+  Future<void> _rememberEmployee(Employee account, String deviceUid) async {
+    await _authStore.saveBinding(
+      employeeNumber: account.employeeNumber,
+      deviceUid: deviceUid,
+    );
+    await _authStore.saveSession(
+      employeeNumber: account.employeeNumber,
+      deviceUid: deviceUid,
+    );
+    await _authStore.saveEmployee(account);
+  }
+
+  Future<void> _enterOfflineSession(Employee account) async {
+    employee = account;
+    await _loadInbox();
+    await _reloadHistory(includeRemote: false);
+    final catalog = _eventsCatalog;
+    if (catalog is CachedEventsCatalog) {
+      _events = await catalog.readCached();
+    } else if (catalog == null) {
+      _events = List.of(SampleData.events);
+    }
+    isLoadingEvents = false;
+    eventsError = _events.isEmpty && !_connectivity.isOnline
+        ? 'Could not load events. Pull down to try again.'
+        : null;
+    notifyListeners();
+  }
+
+  Future<void> _refreshRemoteSession(
+    String deviceUid, {
+    bool skipRestore = false,
+  }) async {
+    if (_disposed || _remoteAuth == null) {
+      return;
+    }
+    if (!skipRestore) {
+      try {
+        final restored = await _remoteAuth
+            .restore(deviceUid: deviceUid)
+            .timeout(const Duration(seconds: 8));
+        if (_disposed) {
+          return;
+        }
+        if (restored != null) {
+          employee = restored;
+          await _rememberEmployee(restored, deviceUid);
+          notifyListeners();
+        }
+      } on AuthBindingException {
+        if (!_disposed) {
+          await logout();
+        }
+        return;
+      } catch (error) {
+        debugPrint('PEAM profile refresh skipped: $error');
+      }
+    }
+    if (_disposed || employee == null) {
+      return;
+    }
+    if (!_connectivity.isOnline) {
+      await _scheduleBackgroundSyncIfNeeded();
+      return;
+    }
+    await refreshEvents();
+    await _syncWhenOnline();
+    await _scheduleBackgroundSyncIfNeeded();
+    await _startLiveNotices();
+    await _startFcm();
+  }
+
+  Future<void> _reloadHistory({bool includeRemote = true}) async {
     final currentEmployee = employee;
     if (currentEmployee == null) {
       _history = const [];
@@ -1006,7 +1114,7 @@ class SessionController extends ChangeNotifier {
     }
     _history = await _local.listForEmployee(currentEmployee);
     _notify();
-    if (!_connectivity.isOnline) {
+    if (!includeRemote || !_connectivity.isOnline) {
       remoteRecordCount = _history
           .where((record) => record.syncStatus == SyncStatus.synced)
           .length;
@@ -1035,6 +1143,8 @@ class SessionController extends ChangeNotifier {
     if (_connectivity.isOnline && employee != null) {
       unawaited(_syncWhenOnline());
       unawaited(refreshNotifications());
+      unawaited(_startLiveNotices());
+      unawaited(_startFcm());
     }
   }
 

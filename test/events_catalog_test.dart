@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:peam/data/sample_data.dart';
 import 'package:peam/models/models.dart';
@@ -56,6 +58,8 @@ void main() {
       event.effectiveStatus(DateTime(2026, 9, 17, 17, 0)),
       EventStatus.completed,
     );
+    expect(event.allowsCheckIn(DateTime(2026, 9, 17, 7, 59)), isFalse);
+    expect(event.allowsCheckIn(DateTime(2026, 9, 17, 8, 0)), isTrue);
     expect(event.allowsCheckIn(DateTime(2026, 9, 17, 16, 59)), isTrue);
     expect(event.allowsCheckIn(DateTime(2026, 9, 17, 17, 0)), isFalse);
     expect(event.cardDateLabel, 'Thu, Sep 17, 2026');
@@ -160,6 +164,37 @@ void main() {
     expect(events, hasLength(1));
     expect(events.first.name, 'Cached outreach');
   });
+
+  test('uses the cached event list when the network does not answer', () async {
+    final cache = MemoryEventsCache();
+    await cache.save([
+      ProvincialEvent(
+        id: 'cached',
+        name: 'Cached outreach',
+        description: '',
+        eventDate: DateTime(2026, 9, 4),
+        startTime: '7:30 AM',
+        endTime: '3:00 PM',
+        venue: 'Malalag Municipal Gymnasium',
+        location: const EventLocation(
+          latitude: 6.6398,
+          longitude: 125.3991,
+          geofenceRadiusMeters: 150,
+        ),
+        status: EventStatus.published,
+      ),
+    ]);
+    final catalog = CachedEventsCatalog(
+      remote: const _SlowCatalog(),
+      cache: cache,
+      remoteTimeout: const Duration(milliseconds: 30),
+    );
+
+    final events = await catalog.listVisible();
+
+    expect(events, hasLength(1));
+    expect(events.first.id, 'cached');
+  });
 }
 
 class _FixedCatalog implements EventsCatalog {
@@ -177,5 +212,14 @@ class _FailingCatalog implements EventsCatalog {
   @override
   Future<List<ProvincialEvent>> listVisible() async {
     throw Exception('offline');
+  }
+}
+
+class _SlowCatalog implements EventsCatalog {
+  const _SlowCatalog();
+
+  @override
+  Future<List<ProvincialEvent>> listVisible() {
+    return Completer<List<ProvincialEvent>>().future;
   }
 }

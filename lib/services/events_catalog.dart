@@ -49,15 +49,22 @@ class SupabaseEventsCatalog implements EventsCatalog {
 }
 
 class CachedEventsCatalog implements EventsCatalog {
-  CachedEventsCatalog({required this.remote, required this.cache});
+  CachedEventsCatalog({
+    required this.remote,
+    required this.cache,
+    this.remoteTimeout = const Duration(seconds: 12),
+  });
 
   final EventsCatalog remote;
   final EventsCache cache;
+  final Duration remoteTimeout;
+
+  Future<List<ProvincialEvent>> readCached() => cache.read();
 
   @override
   Future<List<ProvincialEvent>> listVisible() async {
     try {
-      final live = await remote.listVisible();
+      final live = await remote.listVisible().timeout(remoteTimeout);
       await cache.save(live);
       return live;
     } catch (_) {

@@ -38,7 +38,7 @@ Deno.serve(async (request) => {
     const email = typeof profile?.email === "string" ? profile.email.trim() : "";
     if (!profile || !email.includes("@")) {
       return json({
-        error: "This Employee ID is not on file. Ask HRMDO to create your account.",
+        error: "This Employee ID is not on file. Ask PHRMO to create your account.",
       }, 404);
     }
 

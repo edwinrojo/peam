@@ -26,7 +26,7 @@ export function describeOtpSendError(error: { message?: string } | null): string
     message.includes("signups not allowed") ||
     message.includes("user not found")
   ) {
-    return "This Employee ID is not ready for sign-in. Ask HRMDO to create your account.";
+    return "This Employee ID is not ready for sign-in. Ask PHRMO to create your account.";
   }
   if (
     message.includes("not authorized") ||

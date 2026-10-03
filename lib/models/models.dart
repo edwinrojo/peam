@@ -7,7 +7,8 @@ enum VerificationStatus { pending, verified, failed }
 enum SyncStatus { pending, synced }
 
 class Department {
-  const Department({required this.name, required this.code});
+  const Department({required this.name, required String code})
+    : code = code == 'HRMDO' ? 'PHRMO' : code;
 
   final String name;
   final String code;
@@ -58,6 +59,42 @@ class Employee {
       phone: phone ?? this.phone,
       deviceUid: clearDevice ? null : (deviceUid ?? this.deviceUid),
       deviceName: clearDevice ? 'Unbound' : (deviceName ?? this.deviceName),
+    );
+  }
+
+  Map<String, Object?> toJson() {
+    return {
+      'employeeNumber': employeeNumber,
+      'fullName': fullName,
+      'email': email,
+      'phone': phone,
+      'departmentName': department.name,
+      'departmentCode': department.code,
+      'deviceUid': deviceUid,
+      'deviceName': deviceName,
+    };
+  }
+
+  static Employee? fromJson(Map<String, dynamic> json) {
+    final employeeNumber = json['employeeNumber'] as String?;
+    final fullName = json['fullName'] as String?;
+    if (employeeNumber == null ||
+        employeeNumber.isEmpty ||
+        fullName == null ||
+        fullName.isEmpty) {
+      return null;
+    }
+    return Employee(
+      employeeNumber: employeeNumber,
+      fullName: fullName,
+      email: json['email'] as String?,
+      phone: json['phone'] as String?,
+      department: Department(
+        name: json['departmentName'] as String? ?? 'Unassigned',
+        code: json['departmentCode'] as String? ?? '—',
+      ),
+      deviceUid: json['deviceUid'] as String?,
+      deviceName: json['deviceName'] as String? ?? 'Unbound',
     );
   }
 }
@@ -135,7 +172,7 @@ class ProvincialEvent {
     return EventStatus.ongoing;
   }
 
-  /// Check-in is allowed until the scheduled end time.
+  /// Check-in opens at the scheduled start and closes at the scheduled end.
   /// HR `completed` / `cancelled` / `draft` stay closed.
   bool allowsCheckIn([DateTime? now]) {
     if (status == EventStatus.draft ||
@@ -143,12 +180,31 @@ class ProvincialEvent {
         status == EventStatus.completed) {
       return false;
     }
+    final clock = now ?? DateTime.now();
+    if (isBeforeStart(clock)) {
+      return false;
+    }
     final end = endsAt;
     if (end == null) {
       return status == EventStatus.ongoing;
     }
-    return (now ?? DateTime.now()).isBefore(end);
+    return clock.isBefore(end);
   }
+
+  bool isBeforeStart([DateTime? now]) {
+    final start = startsAt;
+    if (start == null) {
+      return false;
+    }
+    return (now ?? DateTime.now()).isBefore(start);
+  }
+
+  String get checkInClosedTitle =>
+      isBeforeStart() ? 'Not started' : 'Check-in closed';
+
+  String get checkInClosedDetail => isBeforeStart()
+      ? 'Check-in opens at $startTime, when this event starts.'
+      : 'Check-in closed at $endTime. This event has ended.';
 
   /// Check-out stays available after the event ends, until it is recorded.
   bool allowsCheckOut() {

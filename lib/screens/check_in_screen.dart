@@ -80,7 +80,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
         _check = null;
         _error = _isCheckingOut(event)
             ? 'Check-out is not available for this event.'
-            : 'Check-in closed at ${event.endTime}. This event has ended.';
+            : event.checkInClosedDetail;
       });
       return;
     }
@@ -211,7 +211,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                                       : !windowOpen
                                       ? (checkingOut
                                             ? 'Check-out unavailable'
-                                            : 'Check-in closed')
+                                            : event.checkInClosedTitle)
                                       : inside
                                       ? 'Location verified'
                                       : 'Outside the event area',
@@ -227,7 +227,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                                       : !windowOpen
                                       ? (checkingOut
                                             ? 'Check-out is not available for this event.'
-                                            : 'Check-in closed at ${event.endTime}. This event has ended.')
+                                            : event.checkInClosedDetail)
                                       : !inside && check != null
                                       ? _moveInsideMessage(event)
                                       : event.venue,
@@ -319,6 +319,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
                         : !windowOpen
                         ? (checkingOut
                               ? 'Check-out unavailable'
+                              : event.isBeforeStart()
+                              ? 'Not started'
                               : 'Event ended')
                         : _loading
                         ? 'Checking location'
@@ -399,7 +401,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
     if (!_windowOpen(event)) {
       return checkingOut
           ? 'Check-out is not available for this event.'
-          : 'Check-in closed at ${event.endTime}. This event has ended.';
+          : event.checkInClosedDetail;
     }
     if (_loading) {
       return 'Reading GPS to confirm you are inside the ${event.location.geofenceRadiusMeters} m geofence.';
@@ -416,11 +418,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
     if (check.isInside) {
       return 'You are ${check.distanceLabel} from the venue and inside the permitted area.';
     }
-    final moveInside = _moveInsideMessage(event);
-    if (check.isFarFromVenue) {
-      return '$moveInside Your device GPS is ${check.distanceLabel} from this venue (${check.position.coordinateLabel}). On an emulator, set the simulated location to ${event.location.latitude.toStringAsFixed(4)}, ${event.location.longitude.toStringAsFixed(4)}.';
-    }
-    return 'You are ${check.distanceLabel} from the venue. $moveInside';
+    return 'You are ${check.distanceLabel} from the venue. ${_moveInsideMessage(event)}';
   }
 
   String _moveInsideMessage(ProvincialEvent event) {

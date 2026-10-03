@@ -38,7 +38,12 @@ class FcmPushService {
     final messaging = FirebaseMessaging.instance;
     await messaging.requestPermission(alert: true, badge: true, sound: true);
 
-    final token = await messaging.getToken();
+    String? token;
+    try {
+      token = await messaging.getToken().timeout(const Duration(seconds: 8));
+    } catch (error) {
+      debugPrint('PEAM FCM token skipped: $error');
+    }
     if (token != null && token.isNotEmpty) {
       debugPrint('PEAM FCM token ready');
       await onToken(token);

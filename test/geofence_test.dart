@@ -47,14 +47,4 @@ void main() {
     expect(formatDistance(1500), '1.5 km');
     expect(formatDistance(11496416), '11496 km');
   });
-
-  test('emulator default GPS is treated as far from the Capitol', () {
-    final check = checkGeofence(
-      fence: SampleData.capitol,
-      position: const DevicePosition(latitude: 37.4219, longitude: -122.0840),
-    );
-
-    expect(check.isFarFromVenue, isTrue);
-    expect(check.distanceMeters, closeTo(11496000, 80000));
-  });
 }

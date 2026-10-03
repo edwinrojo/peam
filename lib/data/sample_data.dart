@@ -4,7 +4,7 @@ abstract final class SampleData {
   static const departments = <Department>[
     Department(
       name: 'Human Resource Management and Development Office',
-      code: 'HRMDO',
+      code: 'PHRMO',
     ),
     Department(name: "Provincial Governor's Office", code: 'PGO'),
     Department(name: "Provincial Treasurer's Office", code: 'PTO'),

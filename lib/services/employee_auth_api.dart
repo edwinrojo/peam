@@ -27,17 +27,24 @@ class RemoteVerifyResult {
   final String? changeTicket;
 }
 
-class EmployeeAuthApi {
-  EmployeeAuthApi({SupabaseClient? client})
-    : _client = client ?? Supabase.instance.client;
+class AuthBindingException implements Exception {
+  const AuthBindingException();
+}
 
-  final SupabaseClient _client;
+class EmployeeAuthApi {
+  EmployeeAuthApi({SupabaseClient? client}) : _client = client;
+
+  static const _networkTimeout = Duration(seconds: 8);
+
+  final SupabaseClient? _client;
+
+  SupabaseClient get _resolved => _client ?? Supabase.instance.client;
 
   Future<({String? error, RemoteLoginChallenge? challenge})> requestCode(
     String employeeNumber,
   ) async {
     try {
-      final response = await _client.functions.invoke(
+      final response = await _resolved.functions.invoke(
         'request-login-otp',
         body: {'employee_number': employeeNumber.trim()},
       );
@@ -53,7 +60,7 @@ class EmployeeAuthApi {
       if (data['found'] != true) {
         return (
           error:
-              'This Employee ID is not on file. Ask HRMDO to create your account.',
+              'This Employee ID is not on file. Ask PHRMO to create your account.',
           challenge: null,
         );
       }
@@ -78,7 +85,7 @@ class EmployeeAuthApi {
     required String platform,
   }) async {
     try {
-      final response = await _client.functions.invoke(
+      final response = await _resolved.functions.invoke(
         'verify-login-otp',
         body: {
           'employee_number': employeeNumber,
@@ -108,9 +115,9 @@ class EmployeeAuthApi {
 
       final refreshToken = data['refresh_token'] as String?;
       if (refreshToken != null && refreshToken.isNotEmpty) {
-        await _client.auth.setSession(refreshToken);
+        await _resolved.auth.setSession(refreshToken);
       }
-      if (_client.auth.currentSession == null) {
+      if (_resolved.auth.currentSession == null) {
         return const RemoteVerifyResult(
           error:
               'Signed in, but this device could not keep the session. Try again.',
@@ -136,7 +143,7 @@ class EmployeeAuthApi {
     String reason = 'I need to use a new phone for attendance.',
   }) async {
     try {
-      final response = await _client.functions.invoke(
+      final response = await _resolved.functions.invoke(
         'submit-device-change',
         body: {'ticket': ticket, 'reason': reason},
       );
@@ -152,40 +159,43 @@ class EmployeeAuthApi {
   }
 
   Future<Employee?> restore({required String deviceUid}) async {
-    final session = _client.auth.currentSession;
+    final session = _resolved.auth.currentSession;
     if (session == null) {
       return null;
     }
-    final profile = await _client
+    final profile = await _resolved
         .from('profiles')
         .select('employee_number, full_name, email, phone, department_id')
         .eq('id', session.user.id)
-        .maybeSingle();
+        .maybeSingle()
+        .timeout(_networkTimeout);
     if (profile == null) {
-      await _client.auth.signOut();
-      return null;
+      await _resolved.auth.signOut();
+      throw const AuthBindingException();
     }
 
     Map<String, dynamic>? department;
     final departmentId = profile['department_id'];
     if (departmentId != null) {
-      department = await _client
+      department = await _resolved
           .from('departments')
           .select('name, code')
           .eq('id', departmentId)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(_networkTimeout);
     }
 
-    final device = await _client
+    final device = await _resolved
         .from('devices')
         .select('device_uid, device_name')
         .eq('profile_id', session.user.id)
         .eq('is_active', true)
-        .maybeSingle();
+        .maybeSingle()
+        .timeout(_networkTimeout);
     final boundUid = device?['device_uid'] as String?;
     if (boundUid == null || boundUid != deviceUid) {
-      await _client.auth.signOut();
-      return null;
+      await _resolved.auth.signOut();
+      throw const AuthBindingException();
     }
 
     return Employee(
@@ -203,16 +213,16 @@ class EmployeeAuthApi {
   }
 
   Future<void> signOut() async {
-    await _client.auth.signOut();
+    await _resolved.auth.signOut();
   }
 
   Future<void> registerFcmToken(String token) async {
     final trimmed = token.trim();
-    if (trimmed.isEmpty || _client.auth.currentSession == null) {
+    if (trimmed.isEmpty || _resolved.auth.currentSession == null) {
       return;
     }
     try {
-      await _client.rpc(
+      await _resolved.rpc(
         'register_device_fcm_token',
         params: {'p_fcm_token': trimmed},
       );

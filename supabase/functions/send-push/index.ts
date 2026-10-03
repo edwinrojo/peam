@@ -228,8 +228,8 @@ async function notifyDeviceChange(
       ? "Device-change request approved"
       : "Device-change request not approved",
     approved
-      ? "HRMDO approved your request. You can use the new phone for attendance after you sign in."
-      : "HRMDO did not approve the request to bind a new phone.",
+      ? "PHRMO approved your request. You can use the new phone for attendance after you sign in."
+      : "PHRMO did not approve the request to bind a new phone.",
     {
       kind: "deviceChangeUpdate",
       notification_id: `device-change-${request.id}-${request.status}`,

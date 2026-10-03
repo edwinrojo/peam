@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../data/sample_data.dart';
 import '../navigation/notification_tap.dart';
+import '../services/supabase_config.dart';
 import '../state/session_controller.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_vectors.dart';
@@ -90,7 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _busy = false;
       _error =
           error ??
-          'Request sent. HRMDO must approve this phone before you can sign in here.';
+          'Request sent. PHRMO must approve this phone before you can sign in here.';
     });
   }
 
@@ -126,14 +127,18 @@ class _LoginScreenState extends State<LoginScreen> {
                                     formKey: _formKey,
                                     employeeIdController: _employeeIdController,
                                     error: _error,
-                                    showPrototypeHint: !session.isLiveAuth,
+                                    showPrototypeHint: _showPrototypeHint(
+                                      session,
+                                    ),
                                     onSubmit: _sendCode,
                                   )
                                 : _CodeStep(
                                     challenge: challenge,
                                     codeController: _codeController,
                                     error: _error,
-                                    showPrototypeHint: !session.isLiveAuth,
+                                    showPrototypeHint: _showPrototypeHint(
+                                      session,
+                                    ),
                                     deviceChangeRequired:
                                         session.deviceChangeRequired,
                                     onChangeId: () {
@@ -169,7 +174,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Padding(
                     padding: EdgeInsets.fromLTRB(24, 0, 24, 16),
                     child: Text(
-                      'HRMDO creates employee accounts. This phone is bound after the first successful sign-in.',
+                      'PHRMO creates employee accounts. This phone is bound after the first successful sign-in.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: AppColors.muted, height: 1.4),
                     ),
@@ -215,7 +220,7 @@ class _EmployeeIdStep extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         const Text(
-          'Enter your Employee ID. PEAM sends a one-time code to the work email HRMDO stored for you.',
+          'Enter your Employee ID. PEAM sends a one-time code to the work email PHRMO stored for you.',
           style: TextStyle(color: AppColors.muted, height: 1.4),
         ),
         const SizedBox(height: 18),
@@ -226,10 +231,10 @@ class _EmployeeIdStep extends StatelessWidget {
             controller: employeeIdController,
             textInputAction: TextInputAction.done,
             onFieldSubmitted: (_) => onSubmit(),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Employee ID',
-              hintText: '1234',
-              prefixIcon: Icon(Icons.badge_outlined),
+              hintText: showPrototypeHint ? '1234' : null,
+              prefixIcon: const Icon(Icons.badge_outlined),
             ),
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
@@ -268,6 +273,10 @@ class _EmployeeIdStep extends StatelessWidget {
   }
 }
 
+bool _showPrototypeHint(SessionController session) {
+  return !SupabaseConfig.isConfigured && !session.isLiveAuth;
+}
+
 class _CodeStep extends StatelessWidget {
   const _CodeStep({
     required this.challenge,
@@ -303,7 +312,7 @@ class _CodeStep extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'A verification code was sent to the email HRMDO has on file.',
+          'A verification code was sent to the email PHRMO has on file.',
           style: const TextStyle(color: AppColors.muted, height: 1.4),
         ),
         const SizedBox(height: 12),
