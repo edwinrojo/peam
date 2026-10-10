@@ -99,7 +99,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
       setState(() {
         _loading = false;
         _check = null;
-        _error = result.message ?? 'Could not read GPS.';
+        _error = result.message ?? 'Could not find your location.';
       });
       return;
     }
@@ -119,7 +119,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
     if (event == null ||
         !_windowOpen(event) ||
         check == null ||
-        !check.isInside) {
+        !check.allowsAttendance) {
       return;
     }
     SessionScope.of(context).selectEvent(event);
@@ -145,7 +145,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
         }
 
         final check = _check;
-        final inside = check?.isInside ?? false;
+        final inside = check?.allowsAttendance ?? false;
         final checkingOut = _isCheckingOut(event);
         final alreadyRecorded = _alreadyRecorded(event);
         final windowOpen = _windowOpen(event);
@@ -213,8 +213,14 @@ class _CheckInScreenState extends State<CheckInScreen> {
                                             ? 'Check-out unavailable'
                                             : event.checkInClosedTitle)
                                       : inside
-                                      ? 'Location verified'
-                                      : 'Outside the event area',
+                                      ? 'You are at the venue'
+                                      : switch (check?.issue) {
+                                          GeofenceIssue.mockLocation =>
+                                            'Fake location detected',
+                                          GeofenceIssue.lowAccuracy =>
+                                            'Location is not precise enough',
+                                          _ => 'Outside the event area',
+                                        },
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w800,
                                     color: AppColors.ink,
@@ -223,13 +229,13 @@ class _CheckInScreenState extends State<CheckInScreen> {
                                 const SizedBox(height: 4),
                                 Text(
                                   alreadyRecorded
-                                      ? 'This event already has your attendance on this device.'
+                                      ? 'This event already has your attendance on this phone.'
                                       : !windowOpen
                                       ? (checkingOut
                                             ? 'Check-out is not available for this event.'
                                             : event.checkInClosedDetail)
                                       : !inside && check != null
-                                      ? _moveInsideMessage(event)
+                                      ? _issueMessage(check, event)
                                       : event.venue,
                                   style: const TextStyle(
                                     color: AppColors.muted,
@@ -262,24 +268,24 @@ class _CheckInScreenState extends State<CheckInScreen> {
                           _DetailRow(
                             icon: Icons.radar_outlined,
                             label:
-                                'Geofence ${event.location.geofenceRadiusMeters} m · ${event.location.latitude.toStringAsFixed(4)}, ${event.location.longitude.toStringAsFixed(4)}',
+                                'Event area: within ${event.location.geofenceRadiusMeters} m of the venue',
                             isLast: !event.requiresCheckOut && check == null,
                           ),
                           if (event.requiresCheckOut)
                             _DetailRow(
                               icon: Icons.logout_rounded,
                               label: checkingOut
-                                  ? 'Check-out required to complete attendance'
+                                  ? 'Check-out is needed to finish this attendance'
                                   : alreadyRecorded
                                   ? 'Check-out recorded'
-                                  : 'This event requires a check-out',
+                                  : 'This event needs a check-out',
                               isLast: check == null,
                             ),
                           if (check != null)
                             _DetailRow(
                               icon: Icons.my_location_outlined,
                               label:
-                                  'Your GPS · ${check.position.coordinateLabel}',
+                                  'You are ${check.distanceLabel} from the venue',
                               isLast: true,
                             ),
                         ],
@@ -326,7 +332,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                         ? 'Checking location'
                         : inside
                         ? actionLabel
-                        : 'Recheck location',
+                        : 'Check location again',
                     icon: alreadyRecorded
                         ? Icons.check_rounded
                         : !windowOpen
@@ -360,7 +366,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
     if (_error != null ||
         event == null ||
         !_windowOpen(event) ||
-        _check?.isInside != true) {
+        _check?.allowsAttendance != true) {
       return AppColors.peach;
     }
     return AppColors.mint;
@@ -377,14 +383,14 @@ class _CheckInScreenState extends State<CheckInScreen> {
     if (_error != null) {
       return Icons.location_off_outlined;
     }
-    if (_check?.isInside == true) {
+    if (_check?.allowsAttendance == true) {
       return Icons.check_circle_rounded;
     }
     return Icons.wrong_location_outlined;
   }
 
   Color get _statusIconColor {
-    if (_check?.isInside == true) {
+    if (_check?.allowsAttendance == true) {
       return AppColors.mintDeep;
     }
     if (_loading) {
@@ -404,7 +410,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
           : event.checkInClosedDetail;
     }
     if (_loading) {
-      return 'Reading GPS to confirm you are inside the ${event.location.geofenceRadiusMeters} m geofence.';
+      return 'Checking that you are inside the event area.';
     }
     if (_error != null) {
       return _error!;
@@ -415,14 +421,27 @@ class _CheckInScreenState extends State<CheckInScreen> {
           ? 'Location is required before check-out.'
           : 'Location is required before check-in.';
     }
-    if (check.isInside) {
-      return 'You are ${check.distanceLabel} from the venue and inside the permitted area.';
-    }
-    return 'You are ${check.distanceLabel} from the venue. ${_moveInsideMessage(event)}';
+    return switch (check.issue) {
+      null =>
+        'You are ${check.distanceLabel} from the venue and inside the event area.',
+      GeofenceIssue.outside =>
+        'You are ${check.distanceLabel} from the venue. ${_moveInsideMessage(event)}',
+      _ => _issueMessage(check, event),
+    };
+  }
+
+  String _issueMessage(GeofenceCheck check, ProvincialEvent event) {
+    return switch (check.issue) {
+      GeofenceIssue.mockLocation =>
+        'Turn off any app that changes your location, then check your location again.',
+      GeofenceIssue.lowAccuracy =>
+        'Your phone could only find your location within ${check.position.accuracyMeters?.round()} m. Move to an open area or near a window, then check your location again.',
+      _ => _moveInsideMessage(event),
+    };
   }
 
   String _moveInsideMessage(ProvincialEvent event) {
-    return 'Move inside the ${event.location.geofenceRadiusMeters} m geofence, then recheck your location.';
+    return 'Move inside the event area (within ${event.location.geofenceRadiusMeters} m of the venue), then check your location again.';
   }
 }
 

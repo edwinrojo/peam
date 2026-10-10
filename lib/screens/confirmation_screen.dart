@@ -31,8 +31,8 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
       _action = session.pendingAttendanceAction;
       unawaited(
         _action == AttendanceAction.checkOut
-            ? session.confirmCheckOut(checkOutAt: DateTime.now())
-            : session.confirmAttendance(checkInAt: DateTime.now()),
+            ? session.confirmCheckOut()
+            : session.confirmAttendance(),
       );
       setState(() {});
     });
@@ -86,8 +86,8 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
                         event == null
                             ? 'Your attendance has been recorded.'
                             : _action == AttendanceAction.checkOut
-                            ? 'Your check-out for ${event.name} is saved on this device and will sync when connectivity is available.'
-                            : 'Your check-in for ${event.name} is saved on this device and will sync when connectivity is available.',
+                            ? 'Your check-out for ${event.name} is saved on this phone. PHRMO will see it when this phone is online.'
+                            : 'Your check-in for ${event.name} is saved on this phone. PHRMO will see it when this phone is online.',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: AppColors.muted,
@@ -120,11 +120,12 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
                                 ),
                               _Info(label: 'Venue', value: record.event.venue),
                               const _Info(
-                                label: 'Verification',
-                                value: 'Geofence and biometric verified',
+                                label: 'Checked',
+                                value:
+                                    'You were at the venue, and this phone confirmed it is you.',
                               ),
                               _Info(
-                                label: 'Sync status',
+                                label: 'Status',
                                 value: record.syncLabel,
                                 isLast: true,
                               ),

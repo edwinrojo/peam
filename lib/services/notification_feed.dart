@@ -152,7 +152,7 @@ DeviceRequestNoticeResult reconcileDeviceRequests({
             : 'Device-change request not approved',
         body: approved
             ? 'PHRMO approved your request. You can use the new phone for attendance after you sign in.'
-            : 'PHRMO did not approve the request to bind a new phone.',
+            : 'PHRMO did not approve using a new phone.',
         kind: NotificationKind.deviceChangeUpdate,
         createdAt: clock,
       ),
@@ -164,4 +164,81 @@ DeviceRequestNoticeResult reconcileDeviceRequests({
 
 AppNotification reminderNoticeFor(ProvincialEvent event, DateTime createdAt) {
   return _reminderNotice(event, createdAt);
+}
+
+const checkoutReminderLead = Duration(minutes: 30);
+const _minimumCheckoutReminderGap = Duration(minutes: 2);
+
+enum CheckoutReminderStep { none, schedule, due }
+
+class CheckoutReminderPlan {
+  const CheckoutReminderPlan._(this.step, this.at);
+
+  const CheckoutReminderPlan.none() : this._(CheckoutReminderStep.none, null);
+
+  const CheckoutReminderPlan.schedule(DateTime at)
+    : this._(CheckoutReminderStep.schedule, at);
+
+  const CheckoutReminderPlan.due(DateTime at)
+    : this._(CheckoutReminderStep.due, at);
+
+  final CheckoutReminderStep step;
+  final DateTime? at;
+}
+
+/// One reminder while a required check-out is still open.
+///
+/// The time is always after the event has started and before it ends.
+/// After the event ends there is nothing to schedule.
+CheckoutReminderPlan planCheckoutReminder({
+  required ProvincialEvent event,
+  required DateTime? checkInAt,
+  required DateTime? checkOutAt,
+  DateTime? now,
+}) {
+  if (!event.requiresCheckOut || checkInAt == null || checkOutAt != null) {
+    return const CheckoutReminderPlan.none();
+  }
+  final start = event.startsAt;
+  final end = event.endsAt;
+  if (start == null || end == null) {
+    return const CheckoutReminderPlan.none();
+  }
+  final clock = now ?? DateTime.now();
+  if (clock.isBefore(start) || !clock.isBefore(end)) {
+    return const CheckoutReminderPlan.none();
+  }
+
+  var preferred = end.subtract(checkoutReminderLead);
+  if (!preferred.isAfter(start)) {
+    preferred = start.add(
+      Duration(microseconds: end.difference(start).inMicroseconds ~/ 2),
+    );
+  }
+  if (!preferred.isAfter(start) || !preferred.isBefore(end)) {
+    return const CheckoutReminderPlan.none();
+  }
+
+  if (preferred.isAfter(clock)) {
+    return CheckoutReminderPlan.schedule(preferred);
+  }
+  if (end.difference(clock) < _minimumCheckoutReminderGap) {
+    return const CheckoutReminderPlan.none();
+  }
+  return CheckoutReminderPlan.due(clock);
+}
+
+AppNotification checkoutReminderNotice(
+  ProvincialEvent event,
+  DateTime createdAt,
+) {
+  return AppNotification(
+    id: 'checkout-reminder-${event.id}',
+    title: 'Check-out still needed',
+    body:
+        'You checked in to ${event.name}. Check out before ${event.endTime}, while the event is still going.',
+    kind: NotificationKind.checkOutReminder,
+    createdAt: createdAt,
+    eventId: event.id,
+  );
 }

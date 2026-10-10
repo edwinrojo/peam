@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.send-push]
 verify_jwt = true
+
+[functions.remind-checkout]
+verify_jwt = true
+
+[functions.verify-integrity]
+verify_jwt = true

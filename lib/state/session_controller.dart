@@ -6,12 +6,14 @@ import 'package:flutter/widgets.dart';
 import '../data/sample_data.dart';
 import '../models/app_notification.dart';
 import '../models/models.dart';
+import '../services/attendance_integrity.dart';
 import '../services/attendance_stores.dart';
 import '../services/attendance_sync_service.dart';
 import '../services/auth_session_store.dart';
 import '../services/background_attendance_sync.dart';
 import '../services/client_ids.dart';
 import '../services/connectivity_controller.dart';
+import '../services/device_guard.dart';
 import '../services/email_mask.dart';
 import '../services/employee_auth_api.dart';
 import '../services/events_catalog.dart';
@@ -21,6 +23,7 @@ import '../services/live_notification_source.dart';
 import '../services/notification_feed.dart';
 import '../services/notification_inbox.dart';
 import '../services/push_notification_service.dart';
+import '../services/trusted_clock.dart';
 
 export 'session_scope.dart';
 
@@ -47,9 +50,15 @@ class SessionController extends ChangeNotifier {
     NotificationInbox? notificationInbox,
     FcmPushService? fcmPush,
     GlobalKey<NavigatorState>? navigatorKey,
+    DeviceGuard? deviceGuard,
+    TrustedClock? trustedClock,
+    AttendanceIntegrityApi? integrityApi,
     this._liveNotifications,
     this._prototypeEmailCode = SampleData.prototypeEmailCode,
   }) : navigatorKey = navigatorKey ?? GlobalKey<NavigatorState>(),
+       _guard = deviceGuard ?? StubDeviceGuard(),
+       _clock = trustedClock,
+       _integrity = integrityApi,
        _remoteAuth = liveAuth,
        _eventsCatalog = eventsCatalog,
        _events = eventsCatalog == null ? List.of(SampleData.events) : const [],
@@ -80,6 +89,10 @@ class SessionController extends ChangeNotifier {
   final NotificationInbox _inbox;
   final FcmPushService? _fcm;
   final LiveNotificationSource? _liveNotifications;
+  final DeviceGuard _guard;
+  final TrustedClock? _clock;
+  final AttendanceIntegrityApi? _integrity;
+  final Set<String> _integrityAttempted = {};
   final String _prototypeEmailCode;
   final bool _ownsConnectivity;
   final GlobalKey<NavigatorState> navigatorKey;
@@ -366,7 +379,7 @@ class SessionController extends ChangeNotifier {
     if (boundUid != null && boundUid != deviceUid) {
       deviceChangeRequired = true;
       notifyListeners();
-      return 'This account is already bound to another phone. Submit a device-change request for HR approval.';
+      return 'This account is already registered on another phone. Ask PHRMO to approve this phone.';
     }
 
     final bound = account.copyWith(
@@ -383,6 +396,7 @@ class SessionController extends ChangeNotifier {
     pendingChallenge = null;
     deviceChangeRequired = false;
     _deviceChangeTicket = null;
+    await _guard.resetBioGuard();
     await _authStore.saveBinding(
       employeeNumber: bound.employeeNumber,
       deviceUid: deviceUid,
@@ -424,7 +438,7 @@ class SessionController extends ChangeNotifier {
     if (_remoteAuth != null) {
       final ticket = _deviceChangeTicket;
       if (ticket == null) {
-        return 'Verify the email code first, then submit the device-change request.';
+        return 'Enter the email code first, then ask PHRMO to approve this phone.';
       }
       final error = await _remoteAuth.submitDeviceChange(
         ticket: ticket,
@@ -439,7 +453,7 @@ class SessionController extends ChangeNotifier {
       await addNotification(
         title: 'Device-change request sent',
         body:
-            'PHRMO will review the request to bind this phone. You can use PEAM on this device after approval.',
+            'PHRMO will review your request to use this phone. You can sign in here after they approve it.',
         kind: NotificationKind.deviceChangeUpdate,
       );
       return null;
@@ -461,7 +475,7 @@ class SessionController extends ChangeNotifier {
     await addNotification(
       title: 'Device-change request sent',
       body:
-          'PHRMO will review the request to bind this phone. You can use PEAM on this device after approval.',
+          'PHRMO will review your request to use this phone. You can sign in here after they approve it.',
       kind: NotificationKind.deviceChangeUpdate,
     );
     return null;
@@ -501,7 +515,7 @@ class SessionController extends ChangeNotifier {
     return switch (defaultTargetPlatform) {
       TargetPlatform.iOS => 'iPhone',
       TargetPlatform.android => 'Android phone',
-      _ => 'This device',
+      _ => 'This phone',
     };
   }
 
@@ -581,14 +595,35 @@ class SessionController extends ChangeNotifier {
     await _reloadHistory();
   }
 
-  Future<void> confirmAttendance({required DateTime checkInAt}) async {
+  /// Whether the biometric guard key still exists. `changed` means a new
+  /// fingerprint was enrolled since the employee last signed in.
+  Future<BioGuardState> biometricGuardState() => _guard.bioGuardState();
+
+  Future<void> armBiometricGuardIfMissing() async {
+    if (await _guard.bioGuardState() == BioGuardState.missing) {
+      await _guard.armBioGuard();
+    }
+  }
+
+  /// [at] overrides the clock (tests); its source is reported as the phone clock.
+  Future<TrustedTime> _attendanceTime(DateTime? at) async {
+    if (at != null) {
+      return TrustedTime(at, TimeSource.deviceClock);
+    }
+    return await _clock?.now() ??
+        TrustedTime(DateTime.now(), TimeSource.deviceClock);
+  }
+
+  Future<void> confirmAttendance({DateTime? checkInAt}) async {
     final currentEmployee = employee;
     final event = selectedEvent;
     if (currentEmployee == null || event == null) {
       return;
     }
 
-    if (!event.allowsCheckIn(checkInAt)) {
+    final time = await _attendanceTime(checkInAt);
+    final checkedInAt = time.at;
+    if (!event.allowsCheckIn(checkedInAt)) {
       return;
     }
 
@@ -603,7 +638,7 @@ class SessionController extends ChangeNotifier {
     }
 
     final staged = stagedGeofence;
-    if (staged != null && !staged.isInside) {
+    if (staged != null && !staged.allowsAttendance) {
       return;
     }
 
@@ -612,9 +647,13 @@ class SessionController extends ChangeNotifier {
       clientRecordId: newClientRecordId(),
       event: event,
       employee: currentEmployee,
-      checkInAt: checkInAt,
+      checkInAt: checkedInAt,
       checkInLatitude: staged?.position.latitude ?? event.location.latitude,
       checkInLongitude: staged?.position.longitude ?? event.location.longitude,
+      checkInAccuracyMeters: staged?.position.accuracyMeters,
+      checkInMocked: staged?.position.isMocked ?? false,
+      checkInStatic: staged?.position.isStatic ?? false,
+      checkInTimeSource: time.source,
       recordedOffline: recordedOffline,
       geofenceVerified: staged?.isInside ?? true,
       biometricVerified: true,
@@ -623,7 +662,7 @@ class SessionController extends ChangeNotifier {
           ? AttendanceStatus.incomplete
           : AttendanceStatus.present,
       syncStatus: SyncStatus.pending,
-      clientRecordedAt: checkInAt,
+      clientRecordedAt: checkedInAt,
     );
     try {
       await _local.upsert(record);
@@ -641,11 +680,11 @@ class SessionController extends ChangeNotifier {
     _notify();
     await addNotification(
       title: recordedOffline
-          ? 'Attendance recorded offline'
-          : 'Attendance saved on device',
+          ? 'Check-in saved on this phone'
+          : 'Check-in saved',
       body: recordedOffline
-          ? 'Your check-in for ${event.name} is saved on this device and will sync when connectivity returns.'
-          : 'Your check-in for ${event.name} is saved on this phone and will upload to PEAM.',
+          ? 'Your check-in for ${event.name} is on this phone. PHRMO will see it when you have internet.'
+          : 'Your check-in for ${event.name} will be sent to PHRMO.',
       kind: NotificationKind.attendanceSync,
       eventId: event.id,
       showSystemBanner: true,
@@ -659,7 +698,7 @@ class SessionController extends ChangeNotifier {
     await _reloadHistory();
   }
 
-  Future<void> confirmCheckOut({required DateTime checkOutAt}) async {
+  Future<void> confirmCheckOut({DateTime? checkOutAt}) async {
     final currentEmployee = employee;
     final event = selectedEvent;
     if (currentEmployee == null || event == null) {
@@ -668,6 +707,8 @@ class SessionController extends ChangeNotifier {
     if (!event.allowsCheckOut()) {
       return;
     }
+    final time = await _attendanceTime(checkOutAt);
+    final checkedOutAt = time.at;
 
     final existing = await _local.find(
       eventId: event.id,
@@ -678,21 +719,25 @@ class SessionController extends ChangeNotifier {
       await _reloadHistory();
       return;
     }
-    if (checkOutAt.isBefore(existing.checkInAt)) {
+    if (checkedOutAt.isBefore(existing.checkInAt)) {
       return;
     }
 
     final staged = stagedGeofence;
-    if (staged != null && !staged.isInside) {
+    if (staged != null && !staged.allowsAttendance) {
       return;
     }
 
     final recordedOffline = existing.recordedOffline || !_connectivity.isOnline;
     final record = existing.copyWith(
       event: event,
-      checkOutAt: checkOutAt,
+      checkOutAt: checkedOutAt,
       checkOutLatitude: staged?.position.latitude ?? event.location.latitude,
       checkOutLongitude: staged?.position.longitude ?? event.location.longitude,
+      checkOutAccuracyMeters: staged?.position.accuracyMeters,
+      checkOutMocked: staged?.position.isMocked ?? false,
+      checkOutStatic: staged?.position.isStatic ?? false,
+      checkOutTimeSource: time.source,
       recordedOffline: recordedOffline,
       attendanceStatus: AttendanceStatus.present,
       syncStatus: SyncStatus.pending,
@@ -714,11 +759,11 @@ class SessionController extends ChangeNotifier {
     _notify();
     await addNotification(
       title: recordedOffline
-          ? 'Check-out recorded offline'
-          : 'Check-out saved on device',
+          ? 'Check-out saved on this phone'
+          : 'Check-out saved',
       body: recordedOffline
-          ? 'Your check-out for ${event.name} is saved on this device and will sync when connectivity returns.'
-          : 'Your check-out for ${event.name} is saved on this phone and will upload to PEAM.',
+          ? 'Your check-out for ${event.name} is on this phone. PHRMO will see it when you have internet.'
+          : 'Your check-out for ${event.name} will be sent to PHRMO.',
       kind: NotificationKind.attendanceSync,
       eventId: event.id,
       showSystemBanner: true,
@@ -756,6 +801,7 @@ class SessionController extends ChangeNotifier {
     isSyncing = true;
     _notify();
     try {
+      await _refreshClockAnchor();
       final uploaded = await _sync.syncPending(
         local: _local,
         remote: _remote,
@@ -763,15 +809,19 @@ class SessionController extends ChangeNotifier {
       );
       await _mergeRemoteHistory();
       await _reloadHistory();
+      if (await _verifyDeviceIntegrity()) {
+        await _mergeRemoteHistory();
+        await _reloadHistory();
+      }
       if (lastAttendance != null) {
         lastAttendance = recordFor(lastAttendance!.event.id) ?? lastAttendance;
       }
       if (uploaded > 0 && !_disposed) {
         await addNotification(
-          title: 'Attendance synced',
+          title: 'Attendance sent',
           body: uploaded == 1
-              ? '1 pending attendance record was uploaded to PEAM.'
-              : '$uploaded pending attendance records were uploaded to PEAM.',
+              ? '1 attendance record was sent to PHRMO.'
+              : '$uploaded attendance records were sent to PHRMO.',
           kind: NotificationKind.attendanceSync,
           showSystemBanner: true,
         );
@@ -782,6 +832,56 @@ class SessionController extends ChangeNotifier {
       _notify();
       unawaited(_scheduleBackgroundSyncIfNeeded());
     }
+  }
+
+  Future<void> _refreshClockAnchor() async {
+    final clock = _clock;
+    final integrity = _integrity;
+    if (clock == null || integrity == null) {
+      return;
+    }
+    final serverNow = await integrity.serverNow();
+    if (serverNow != null) {
+      await clock.anchor(serverNow);
+    }
+  }
+
+  /// Asks Play Integrity about this phone for recently uploaded records.
+  /// Runs in the foreground only: the native channel is not available to
+  /// the background sync isolate. Returns true when a verdict was stored.
+  Future<bool> _verifyDeviceIntegrity() async {
+    final integrity = _integrity;
+    if (integrity == null || _disposed) {
+      return false;
+    }
+    final candidates = _history
+        .where(
+          (record) =>
+              record.syncStatus == SyncStatus.synced &&
+              record.integrityStatus == IntegrityStatus.unchecked &&
+              !_integrityAttempted.contains(record.clientRecordId),
+        )
+        .take(5)
+        .toList();
+    var stored = false;
+    for (final record in candidates) {
+      _integrityAttempted.add(record.clientRecordId);
+      final token = await _guard.integrityToken(
+        integrityNonce(record.clientRecordId),
+      );
+      if (token == null) {
+        continue;
+      }
+      final status = await integrity.verify(
+        clientRecordId: record.clientRecordId,
+        token: token,
+      );
+      if (status != null) {
+        stored = true;
+        await _local.upsert(record.copyWith(integrityStatus: status));
+      }
+    }
+    return stored;
   }
 
   Future<void> _syncWhenOnline() async {
@@ -912,9 +1012,7 @@ class SessionController extends ChangeNotifier {
       onToken: auth.registerFcmToken,
       onOpened: _push.deliverTap,
       onForeground: (title, body, payload) {
-        unawaited(
-          _push.showBanner(title: title, body: body, payload: payload),
-        );
+        unawaited(_push.showBanner(title: title, body: body, payload: payload));
       },
     );
   }
@@ -995,6 +1093,62 @@ class SessionController extends ChangeNotifier {
 
   int _reminderId(String eventId) {
     return 500000 + (eventId.hashCode.abs() % 400000);
+  }
+
+  int _checkoutReminderId(String eventId) {
+    return 900000 + (eventId.hashCode.abs() % 50000);
+  }
+
+  Future<void> _syncCheckoutReminders() async {
+    if (_disposed) {
+      return;
+    }
+    final now = DateTime.now();
+    final due = <AppNotification>[];
+    final activeIds = <String>{};
+    for (final record in _history) {
+      final event = record.event;
+      final plan = planCheckoutReminder(
+        event: event,
+        checkInAt: record.checkInAt,
+        checkOutAt: record.checkOutAt,
+        now: now,
+      );
+      final id = _checkoutReminderId(event.id);
+      if (plan.step == CheckoutReminderStep.schedule && plan.at != null) {
+        final notice = checkoutReminderNotice(event, plan.at!);
+        activeIds.add(notice.id);
+        debugPrint(
+          'PEAM checkout reminder scheduled at ${plan.at} for ${event.name}',
+        );
+        await _push.scheduleBanner(
+          id: id,
+          title: notice.title,
+          body: notice.body,
+          when: plan.at!,
+          payload: notice.tapPayload.encode(),
+        );
+        continue;
+      }
+      await _push.cancel(id);
+      if (plan.step == CheckoutReminderStep.due && plan.at != null) {
+        final notice = checkoutReminderNotice(event, plan.at!);
+        activeIds.add(notice.id);
+        due.add(notice);
+      }
+    }
+    final kept = [
+      for (final item in _notifications)
+        if (item.kind != NotificationKind.checkOutReminder ||
+            activeIds.contains(item.id))
+          item,
+    ];
+    if (kept.length != _notifications.length) {
+      _notifications = kept;
+      await _persistInbox();
+      _notify();
+    }
+    await _prependNotices(due);
   }
 
   Future<Employee?> _cachedEmployee(String deviceUid) async {
@@ -1114,6 +1268,7 @@ class SessionController extends ChangeNotifier {
     }
     _history = await _local.listForEmployee(currentEmployee);
     _notify();
+    unawaited(_syncCheckoutReminders());
     if (!includeRemote || !_connectivity.isOnline) {
       remoteRecordCount = _history
           .where((record) => record.syncStatus == SyncStatus.synced)

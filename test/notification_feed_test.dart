@@ -76,6 +76,80 @@ void main() {
     expect(result.notices.single.title, 'Event updated');
   });
 
+  test('check-out reminder is scheduled inside the event', () {
+    final event = ProvincialEvent(
+      id: 'evt-open',
+      name: 'Assembly',
+      description: '',
+      eventDate: DateTime(2026, 10, 10),
+      startTime: '8:00 AM',
+      endTime: '5:00 PM',
+      venue: 'Capitol',
+      location: SampleData.capitol,
+      status: EventStatus.ongoing,
+      requiresCheckOut: true,
+    );
+
+    final planned = planCheckoutReminder(
+      event: event,
+      checkInAt: DateTime(2026, 10, 10, 8, 12),
+      checkOutAt: null,
+      now: DateTime(2026, 10, 10, 9),
+    );
+
+    expect(planned.step, CheckoutReminderStep.schedule);
+    expect(planned.at, DateTime(2026, 10, 10, 16, 30));
+  });
+
+  test('check-out reminder is not sent after the event ends', () {
+    final event = ProvincialEvent(
+      id: 'evt-open',
+      name: 'Assembly',
+      description: '',
+      eventDate: DateTime(2026, 10, 10),
+      startTime: '8:00 AM',
+      endTime: '5:00 PM',
+      venue: 'Capitol',
+      location: SampleData.capitol,
+      status: EventStatus.ongoing,
+      requiresCheckOut: true,
+    );
+
+    final planned = planCheckoutReminder(
+      event: event,
+      checkInAt: DateTime(2026, 10, 10, 8, 12),
+      checkOutAt: null,
+      now: DateTime(2026, 10, 10, 17),
+    );
+
+    expect(planned.step, CheckoutReminderStep.none);
+  });
+
+  test('a late check-in still gets a reminder before the event ends', () {
+    final event = ProvincialEvent(
+      id: 'evt-open',
+      name: 'Assembly',
+      description: '',
+      eventDate: DateTime(2026, 10, 10),
+      startTime: '8:00 AM',
+      endTime: '5:00 PM',
+      venue: 'Capitol',
+      location: SampleData.capitol,
+      status: EventStatus.ongoing,
+      requiresCheckOut: true,
+    );
+
+    final planned = planCheckoutReminder(
+      event: event,
+      checkInAt: DateTime(2026, 10, 10, 16, 40),
+      checkOutAt: null,
+      now: DateTime(2026, 10, 10, 16, 40),
+    );
+
+    expect(planned.step, CheckoutReminderStep.due);
+    expect(planned.at, DateTime(2026, 10, 10, 16, 40));
+  });
+
   test('an event starting within 30 minutes creates a reminder', () {
     final now = DateTime(2026, 9, 21, 7, 40);
     final event = ProvincialEvent(

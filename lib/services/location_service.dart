@@ -8,14 +8,54 @@ class DevicePosition {
     required this.latitude,
     required this.longitude,
     this.accuracyMeters,
+    this.isMocked = false,
+    this.isStatic = false,
   });
 
   final double latitude;
   final double longitude;
   final double? accuracyMeters;
 
+  /// Android reported the fix as coming from a mock-location app.
+  final bool isMocked;
+
+  /// Every sample matched exactly; real GPS normally drifts a little.
+  final bool isStatic;
+
   String get coordinateLabel =>
       '${latitude.toStringAsFixed(4)}, ${longitude.toStringAsFixed(4)}';
+}
+
+/// Combines several fixes into one: the most accurate fix, mocked if any
+/// sample was mocked, and static when 3+ samples are identical.
+DevicePosition combineSamples(List<DevicePosition> samples) {
+  if (samples.isEmpty) {
+    throw ArgumentError('At least one location sample is required.');
+  }
+  var best = samples.first;
+  for (final sample in samples.skip(1)) {
+    final bestAccuracy = best.accuracyMeters ?? double.infinity;
+    final accuracy = sample.accuracyMeters ?? double.infinity;
+    if (accuracy < bestAccuracy) {
+      best = sample;
+    }
+  }
+  final first = samples.first;
+  final identical =
+      samples.length >= 3 &&
+      samples.every(
+        (sample) =>
+            sample.latitude == first.latitude &&
+            sample.longitude == first.longitude &&
+            sample.accuracyMeters == first.accuracyMeters,
+      );
+  return DevicePosition(
+    latitude: best.latitude,
+    longitude: best.longitude,
+    accuracyMeters: best.accuracyMeters,
+    isMocked: samples.any((sample) => sample.isMocked),
+    isStatic: identical,
+  );
 }
 
 class LocationResult {
@@ -62,7 +102,13 @@ class StubLocationService implements LocationService {
 }
 
 class DeviceLocationService implements LocationService {
-  const DeviceLocationService();
+  const DeviceLocationService({
+    this.sampleCount = 3,
+    this.sampleGap = const Duration(seconds: 3),
+  });
+
+  final int sampleCount;
+  final Duration sampleGap;
 
   @override
   Future<LocationResult> currentPosition() async {
@@ -92,16 +138,16 @@ class DeviceLocationService implements LocationService {
         );
       }
 
-      final fix = await Geolocator.getCurrentPosition(
-        locationSettings: _locationSettings(),
-      );
-      return LocationResult.ok(
-        DevicePosition(
-          latitude: fix.latitude,
-          longitude: fix.longitude,
-          accuracyMeters: fix.accuracy,
-        ),
-      );
+      final samples = [await _sample()];
+      for (var i = 1; i < sampleCount; i++) {
+        await Future<void>.delayed(sampleGap);
+        try {
+          samples.add(await _sample());
+        } catch (_) {
+          break;
+        }
+      }
+      return LocationResult.ok(combineSamples(samples));
     } on LocationServiceDisabledException {
       return const LocationResult.error(
         LocationFault.disabled,
@@ -110,9 +156,21 @@ class DeviceLocationService implements LocationService {
     } catch (_) {
       return const LocationResult.error(
         LocationFault.failed,
-        'Could not read GPS. Move to an open area and try again.',
+        'Could not find your location. Move to an open area and try again.',
       );
     }
+  }
+
+  Future<DevicePosition> _sample() async {
+    final fix = await Geolocator.getCurrentPosition(
+      locationSettings: _locationSettings(),
+    );
+    return DevicePosition(
+      latitude: fix.latitude,
+      longitude: fix.longitude,
+      accuracyMeters: fix.accuracy,
+      isMocked: fix.isMocked,
+    );
   }
 }
 

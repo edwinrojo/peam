@@ -34,9 +34,30 @@ CREATE TABLE IF NOT EXISTS {table} (
   client_recorded_at TEXT,
   synced_at TEXT,
   created_at TEXT NOT NULL,
+  check_in_accuracy_m REAL,
+  check_out_accuracy_m REAL,
+  check_in_mocked INTEGER NOT NULL DEFAULT 0,
+  check_out_mocked INTEGER NOT NULL DEFAULT 0,
+  check_in_static INTEGER NOT NULL DEFAULT 0,
+  check_out_static INTEGER NOT NULL DEFAULT 0,
+  check_in_time_source TEXT,
+  check_out_time_source TEXT,
+  integrity_status TEXT NOT NULL DEFAULT 'unchecked',
   UNIQUE (event_id, employee_number)
 )
 ''';
+
+const _antiSpoofingColumns = [
+  'check_in_accuracy_m REAL',
+  'check_out_accuracy_m REAL',
+  'check_in_mocked INTEGER NOT NULL DEFAULT 0',
+  'check_out_mocked INTEGER NOT NULL DEFAULT 0',
+  'check_in_static INTEGER NOT NULL DEFAULT 0',
+  'check_out_static INTEGER NOT NULL DEFAULT 0',
+  'check_in_time_source TEXT',
+  'check_out_time_source TEXT',
+  "integrity_status TEXT NOT NULL DEFAULT 'unchecked'",
+];
 
 class PeamAttendanceDatabase {
   PeamAttendanceDatabase._(this.db);
@@ -48,7 +69,7 @@ class PeamAttendanceDatabase {
     final path = p.join(directory.path, 'peam_attendance.db');
     final database = await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (db, version) async {
         await db.execute(_createSql.replaceAll('{table}', _localTable));
         await db.execute(_createSql.replaceAll('{table}', _remoteTable));
@@ -61,6 +82,13 @@ class PeamAttendanceDatabase {
           await db.execute(
             'ALTER TABLE $_remoteTable ADD COLUMN event_json TEXT',
           );
+        }
+        if (oldVersion < 3) {
+          for (final table in [_localTable, _remoteTable]) {
+            for (final column in _antiSpoofingColumns) {
+              await db.execute('ALTER TABLE $table ADD COLUMN $column');
+            }
+          }
         }
       },
     );
@@ -267,6 +295,15 @@ abstract final class AttendanceRowCodec {
       'client_recorded_at': record.clientRecordedAt.toIso8601String(),
       'synced_at': record.syncedAt?.toIso8601String(),
       'created_at': record.clientRecordedAt.toIso8601String(),
+      'check_in_accuracy_m': record.checkInAccuracyMeters,
+      'check_out_accuracy_m': record.checkOutAccuracyMeters,
+      'check_in_mocked': record.checkInMocked ? 1 : 0,
+      'check_out_mocked': record.checkOutMocked ? 1 : 0,
+      'check_in_static': record.checkInStatic ? 1 : 0,
+      'check_out_static': record.checkOutStatic ? 1 : 0,
+      'check_in_time_source': record.checkInTimeSource?.dbName,
+      'check_out_time_source': record.checkOutTimeSource?.dbName,
+      'integrity_status': record.integrityStatus.dbName,
     };
   }
 
@@ -312,6 +349,15 @@ abstract final class AttendanceRowCodec {
           : SyncStatus.pending,
       clientRecordedAt: _parseTime(row['client_recorded_at']) ?? checkInAt,
       syncedAt: _parseTime(row['synced_at']),
+      checkInAccuracyMeters: (row['check_in_accuracy_m'] as num?)?.toDouble(),
+      checkOutAccuracyMeters: (row['check_out_accuracy_m'] as num?)?.toDouble(),
+      checkInMocked: (row['check_in_mocked'] as int? ?? 0) == 1,
+      checkOutMocked: (row['check_out_mocked'] as int? ?? 0) == 1,
+      checkInStatic: (row['check_in_static'] as int? ?? 0) == 1,
+      checkOutStatic: (row['check_out_static'] as int? ?? 0) == 1,
+      checkInTimeSource: TimeSourceDb.parse(row['check_in_time_source']),
+      checkOutTimeSource: TimeSourceDb.parse(row['check_out_time_source']),
+      integrityStatus: IntegrityStatusDb.parse(row['integrity_status']),
     );
   }
 

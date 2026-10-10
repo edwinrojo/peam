@@ -72,12 +72,12 @@ Deno.serve(async (request) => {
           platform,
         }),
         message:
-          "This account is already bound to another phone. Submit a device-change request for HR approval.",
+          "This account is already registered on another phone. Ask PHRMO to approve this phone.",
       });
     }
     if (bindError) {
       console.error("bind_employee_device", bindError);
-      return json({ error: "Could not bind this phone." }, 400);
+      return json({ error: "Could not register this phone. Try again." }, 400);
     }
 
     const device = bound as { device_uid?: string; device_name?: string } | null;

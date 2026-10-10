@@ -23,7 +23,7 @@ Deno.serve(async (request) => {
     const claims = await readDeviceChangeTicket(ticket);
     if (!claims) {
       return json({
-        error: "Verify the email code again, then submit the device-change request.",
+        error: "Enter the email code again, then ask PHRMO to approve this phone.",
       }, 401);
     }
 
@@ -47,16 +47,16 @@ Deno.serve(async (request) => {
     if (error) {
       if (error.code === "23505") {
         return json({
-          error: "A device-change request is already pending for this account.",
+          error: "A request to use a new phone is already waiting for PHRMO.",
         }, 409);
       }
       console.error(error);
-      return json({ error: "Could not submit the device-change request." }, 400);
+      return json({ error: "Could not send the request. Try again." }, 400);
     }
 
     return json({ submitted: true });
   } catch (error) {
     console.error(error);
-    return json({ error: "Could not submit the device-change request." }, 500);
+    return json({ error: "Could not send the request. Try again." }, 500);
   }
 });

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/biometric_auth_service.dart';
+import '../services/device_guard.dart';
 import '../state/biometric_scope.dart';
 import '../state/session_controller.dart';
 import '../theme/app_theme.dart';
@@ -9,6 +10,7 @@ import '../widgets/app_vector.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/soft_card.dart';
 import 'confirmation_screen.dart';
+import 'login_screen.dart';
 
 class BiometricScreen extends StatefulWidget {
   const BiometricScreen({super.key});
@@ -25,6 +27,7 @@ class _BiometricScreenState extends State<BiometricScreen> {
   BiometricMethod _method = BiometricMethod.fingerprint;
   BiometricAvailability _availability = BiometricAvailability.none;
   String? _error;
+  bool _biometricsChanged = false;
 
   @override
   void initState() {
@@ -35,13 +38,21 @@ class _BiometricScreenState extends State<BiometricScreen> {
   }
 
   Future<void> _loadAvailability() async {
+    final session = SessionScope.of(context);
     final availability = await BiometricAuthScope.of(context).probe();
+    final guard = await session.biometricGuardState();
     if (!mounted) {
       return;
     }
     setState(() {
       _availability = availability;
       _loadingAvailability = false;
+      if (guard == BioGuardState.changed) {
+        _biometricsChanged = true;
+        _error =
+            'A new fingerprint or face was added to this phone. Sign in again to confirm it is still you.';
+        return;
+      }
       if (availability.supports(BiometricMethod.fingerprint)) {
         _method = BiometricMethod.fingerprint;
       } else if (availability.supports(BiometricMethod.face)) {
@@ -49,13 +60,25 @@ class _BiometricScreenState extends State<BiometricScreen> {
       }
       if (!availability.hasAny) {
         _error =
-            'No fingerprint or Face ID is enrolled on this phone. Add one in system Settings, then return to PEAM.';
+            'This phone has no fingerprint or face unlock set up. Add one in your phone settings, then come back to PEAM.';
       }
     });
   }
 
+  Future<void> _signInAgain() async {
+    final session = SessionScope.of(context);
+    await session.logout();
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
   Future<void> _authenticate() async {
-    if (_scanning || !_availability.supports(_method)) {
+    if (_scanning || _biometricsChanged || !_availability.supports(_method)) {
       return;
     }
     setState(() {
@@ -92,17 +115,24 @@ class _BiometricScreenState extends State<BiometricScreen> {
       });
       return;
     }
+    await session.armBiometricGuardIfMissing();
+    if (!mounted) {
+      return;
+    }
     Navigator.of(context).pushReplacementNamed(ConfirmationScreen.routeName);
   }
 
   @override
   Widget build(BuildContext context) {
     final canAuthenticate =
-        !_scanning && !_loadingAvailability && _availability.supports(_method);
+        !_scanning &&
+        !_loadingAvailability &&
+        !_biometricsChanged &&
+        _availability.supports(_method);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Authenticate'),
+        title: const Text('Confirm it is you'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           onPressed: _scanning ? null : () => Navigator.of(context).maybePop(),
@@ -179,8 +209,8 @@ class _BiometricScreenState extends State<BiometricScreen> {
                       const SizedBox(height: 14),
                       Text(
                         _method == BiometricMethod.face
-                            ? 'Look at the front camera. Samsung may still offer fingerprint as a backup in the system prompt.'
-                            : 'Use the fingerprint sensor. The prompt is limited to fingerprint when Face is not selected.',
+                            ? 'Look at the front camera. Your phone may also offer fingerprint.'
+                            : 'Place your finger on the sensor.',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: AppColors.muted,
@@ -193,7 +223,7 @@ class _BiometricScreenState extends State<BiometricScreen> {
                       const SizedBox(height: 20),
                       Text(
                         _method == BiometricMethod.face
-                            ? 'Waiting for Face ID…'
+                            ? 'Waiting for face unlock…'
                             : 'Waiting for fingerprint…',
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
@@ -220,17 +250,24 @@ class _BiometricScreenState extends State<BiometricScreen> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-              child: PrimaryButton(
-                key: const Key('biometric-button'),
-                label: _scanning
-                    ? 'Authenticating'
-                    : _method == BiometricMethod.face
-                    ? 'Verify with Face ID'
-                    : 'Verify with fingerprint',
-                icon: Icons.verified_user_outlined,
-                loading: _scanning || _loadingAvailability,
-                onPressed: canAuthenticate ? _authenticate : null,
-              ),
+              child: _biometricsChanged
+                  ? PrimaryButton(
+                      key: const Key('biometric-sign-in-again'),
+                      label: 'Sign in again',
+                      icon: Icons.login_rounded,
+                      onPressed: _signInAgain,
+                    )
+                  : PrimaryButton(
+                      key: const Key('biometric-button'),
+                      label: _scanning
+                          ? 'Confirming…'
+                          : _method == BiometricMethod.face
+                          ? 'Confirm with face unlock'
+                          : 'Confirm with fingerprint',
+                      icon: Icons.verified_user_outlined,
+                      loading: _scanning || _loadingAvailability,
+                      onPressed: canAuthenticate ? _authenticate : null,
+                    ),
             ),
           ],
         ),
@@ -245,7 +282,7 @@ class _BiometricScreenState extends State<BiometricScreen> {
     if (_availability.supports(method)) {
       return 'Available';
     }
-    return 'Not enrolled';
+    return 'Not set up';
   }
 }
 

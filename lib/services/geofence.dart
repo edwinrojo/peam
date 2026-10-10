@@ -23,6 +23,8 @@ double distanceMeters({
   return earthRadiusMeters * c;
 }
 
+enum GeofenceIssue { mockLocation, lowAccuracy, outside }
+
 class GeofenceCheck {
   const GeofenceCheck({
     required this.position,
@@ -35,6 +37,23 @@ class GeofenceCheck {
   final int radiusMeters;
 
   bool get isInside => distanceMeters <= radiusMeters;
+
+  /// The first reason this fix cannot be used for attendance, if any.
+  GeofenceIssue? get issue {
+    if (position.isMocked) {
+      return GeofenceIssue.mockLocation;
+    }
+    final accuracy = position.accuracyMeters;
+    if (accuracy != null && accuracy > radiusMeters) {
+      return GeofenceIssue.lowAccuracy;
+    }
+    if (!isInside) {
+      return GeofenceIssue.outside;
+    }
+    return null;
+  }
+
+  bool get allowsAttendance => issue == null;
 
   int get distanceRounded => distanceMeters.round();
 

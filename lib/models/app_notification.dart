@@ -3,6 +3,7 @@ import 'dart:convert';
 enum NotificationKind {
   eventPublished,
   eventReminder,
+  checkOutReminder,
   deviceChangeUpdate,
   attendanceSync,
   adminNotice,
@@ -13,7 +14,8 @@ enum NotificationDestination { checkIn, history, profile, inbox }
 NotificationDestination notificationDestination(NotificationKind kind) {
   return switch (kind) {
     NotificationKind.eventPublished ||
-    NotificationKind.eventReminder => NotificationDestination.checkIn,
+    NotificationKind.eventReminder ||
+    NotificationKind.checkOutReminder => NotificationDestination.checkIn,
     NotificationKind.attendanceSync => NotificationDestination.history,
     NotificationKind.deviceChangeUpdate => NotificationDestination.profile,
     NotificationKind.adminNotice => NotificationDestination.inbox,
@@ -117,6 +119,7 @@ class AppNotification {
   String get kindLabel => switch (kind) {
     NotificationKind.eventPublished => 'Event published',
     NotificationKind.eventReminder => 'Reminder',
+    NotificationKind.checkOutReminder => 'Check-out',
     NotificationKind.deviceChangeUpdate => 'Device change',
     NotificationKind.attendanceSync => 'Attendance',
     NotificationKind.adminNotice => 'Notice',

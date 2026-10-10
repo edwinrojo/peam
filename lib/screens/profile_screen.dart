@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/models.dart';
 import '../state/session_controller.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_vectors.dart';
@@ -85,10 +86,15 @@ class ProfileScreen extends StatelessWidget {
                         ? 'Not provided'
                         : employee.phone!,
                   ),
-                  _DetailRow(label: 'Device', value: employee.deviceName),
                   _DetailRow(
-                    label: 'Binding',
-                    value: employee.deviceBound ? 'Active' : 'Unbound',
+                    label: 'Registered phone',
+                    value: _registeredPhone(employee),
+                  ),
+                  _DetailRow(
+                    label: 'Registration',
+                    value: employee.deviceBound
+                        ? 'This phone is registered'
+                        : 'Not registered',
                     showDivider: false,
                   ),
                 ],
@@ -114,6 +120,14 @@ class ProfileScreen extends StatelessWidget {
       },
     );
   }
+}
+
+String _registeredPhone(Employee employee) {
+  final name = employee.deviceName.trim();
+  if (name.isEmpty || name == 'Unbound') {
+    return 'This phone';
+  }
+  return name;
 }
 
 class _DetailRow extends StatelessWidget {

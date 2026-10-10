@@ -34,6 +34,10 @@ void main() {
       NotificationDestination.checkIn,
     );
     expect(
+      notificationDestination(NotificationKind.checkOutReminder),
+      NotificationDestination.checkIn,
+    );
+    expect(
       notificationDestination(NotificationKind.attendanceSync),
       NotificationDestination.history,
     );

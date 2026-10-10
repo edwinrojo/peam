@@ -58,16 +58,16 @@ class HistoryScreen extends StatelessWidget {
 
   String _subtitle(SessionController session, List<AttendanceRecord> records) {
     if (records.isEmpty) {
-      return 'Check-ins for this employee appear here after you record attendance.';
+      return 'Your check-ins appear here after you record attendance.';
     }
     if (session.pendingCount == 0) {
       return records.length == 1
-          ? '1 record · uploaded'
-          : '${records.length} records · all uploaded';
+          ? '1 record · sent to PHRMO'
+          : '${records.length} records · all sent to PHRMO';
     }
     final pending = session.pendingCount == 1
-        ? '1 waiting to upload'
-        : '${session.pendingCount} waiting to upload';
+        ? '1 still on this phone'
+        : '${session.pendingCount} still on this phone';
     return '${records.length} records · $pending';
   }
 }
@@ -101,10 +101,10 @@ class _SyncStatusCard extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 syncing
-                    ? 'Uploading…'
+                    ? 'Sending…'
                     : online
                     ? 'Online'
-                    : 'Offline',
+                    : 'No internet',
                 style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   color: AppColors.ink,
@@ -121,6 +121,11 @@ class _SyncStatusCard extends StatelessWidget {
               height: 1.4,
             ),
           ),
+          const SizedBox(height: 8),
+          const Text(
+            'Pending means the attendance is saved on this phone. PHRMO will see it after the phone is online. Synced means it was already sent, so PHRMO can see it.',
+            style: TextStyle(color: AppColors.ink, fontSize: 13, height: 1.4),
+          ),
           if (online && pending > 0) ...[
             const SizedBox(height: 12),
             FilledButton(
@@ -134,7 +139,7 @@ class _SyncStatusCard extends StatelessWidget {
                       }
                       _showSyncResult(context, uploaded);
                     },
-              child: Text(syncing ? 'Uploading…' : 'Retry upload'),
+              child: Text(syncing ? 'Sending…' : 'Send now'),
             ),
           ],
         ],
@@ -148,17 +153,17 @@ class _SyncStatusCard extends StatelessWidget {
     required bool syncing,
   }) {
     if (syncing) {
-      return 'Sending saved check-ins to PEAM.';
+      return 'Sending saved attendance to PHRMO.';
     }
     if (!online) {
-      return 'No network on this phone. New check-ins stay here and upload when connectivity returns, even if PEAM is closed.';
+      return 'No internet on this phone. New attendance stays here and is sent when you are back online, even if PEAM is closed.';
     }
     if (pending > 0) {
       return pending == 1
-          ? '1 check-in is still on this phone. It will upload automatically, or retry now.'
-          : '$pending check-ins are still on this phone. They will upload automatically, or retry now.';
+          ? '1 attendance record is still only on this phone. It will be sent on its own, or tap Send now.'
+          : '$pending attendance records are still only on this phone. They will be sent on their own, or tap Send now.';
     }
-    return 'This phone is connected. Saved attendance is uploaded to PEAM.';
+    return 'This phone is online. PHRMO has the attendance saved here.';
   }
 }
 
@@ -247,10 +252,23 @@ class _HistoryCard extends StatelessWidget {
                       fontSize: 12,
                     ),
                   ),
-                ] else if (record.event.requiresCheckOut) ...[
+                ] else if (record.event.requiresCheckOut &&
+                    !record.needsReview) ...[
                   const SizedBox(height: 2),
                   const Text(
-                    'Check-out required',
+                    'Check-out still needed',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.peachDeep,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+                if (record.needsReview) ...[
+                  const SizedBox(height: 2),
+                  const Text(
+                    'PHRMO needs to review this attendance',
+                    key: Key('history-review-note'),
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       color: AppColors.peachDeep,
@@ -278,13 +296,15 @@ class _HistoryCard extends StatelessWidget {
                     ),
                     if (record.recordedOffline)
                       _Chip(
-                        label: 'Recorded offline',
+                        label: 'Saved without internet',
                         color: AppColors.skyDeep,
                         fill: AppColors.sky,
                       ),
-                    if (record.geofenceVerified && record.biometricVerified)
+                    if (record.geofenceVerified &&
+                        record.biometricVerified &&
+                        !record.needsReview)
                       _Chip(
-                        label: 'Verified',
+                        label: 'Checked',
                         color: AppColors.mintDeep,
                         fill: AppColors.mint,
                       ),
@@ -299,9 +319,12 @@ class _HistoryCard extends StatelessWidget {
   }
 
   String _status(AttendanceRecord record) {
+    if (record.needsReview) {
+      return 'PHRMO review';
+    }
     return switch (record.attendanceStatus) {
       AttendanceStatus.present => 'Present',
-      AttendanceStatus.incomplete => 'Incomplete',
+      AttendanceStatus.incomplete => 'Needs check-out',
       AttendanceStatus.absent => 'Absent',
     };
   }
@@ -346,10 +369,10 @@ class _HistoryCard extends StatelessWidget {
 
 void _showSyncResult(BuildContext context, int uploaded) {
   final message = uploaded == 0
-      ? 'No pending records to upload.'
+      ? 'Nothing left to send.'
       : uploaded == 1
-      ? '1 attendance record uploaded to PEAM.'
-      : '$uploaded attendance records uploaded to PEAM.';
+      ? '1 attendance record was sent to PHRMO.'
+      : '$uploaded attendance records were sent to PHRMO.';
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }
 

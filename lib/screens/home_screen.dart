@@ -71,8 +71,12 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     final session = SessionScope.of(context);
-    if (session.searchQuery != _searchController.text) {
-      session.updateSearch(_searchController.text);
+    final text = _searchController.text;
+    if (session.searchQuery != text) {
+      session.updateSearch(text);
+    }
+    if (text.trim().isEmpty && session.statusFilter != null) {
+      session.updateStatusFilter(null);
     }
   }
 
@@ -92,6 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final session = SessionScope.of(context);
     final employee = session.employee;
     final searching = _searching;
+    final query = session.searchQuery.trim();
     final events = session.eventsMatching(ignoreStatusFilter: searching);
     final ongoingCount = session
         .eventsMatching(ignoreStatusFilter: true)
@@ -106,7 +111,75 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Row(
+              children: [
+                if (searching)
+                  IconButton(
+                    key: const Key('home-search-back'),
+                    tooltip: 'Close search',
+                    onPressed: _closeSearch,
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 18,
+                    ),
+                  ),
+                Expanded(
+                  child: TextField(
+                    key: const Key('home-search'),
+                    controller: _searchController,
+                    focusNode: _searchFocus,
+                    onChanged: session.updateSearch,
+                    onSubmitted: (_) => _searchFocus.unfocus(),
+                    textInputAction: TextInputAction.search,
+                    decoration: const InputDecoration(
+                      hintText: 'Search events or venues',
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                  ),
+                ),
+                if (query.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  TextButton(
+                    key: const Key('home-search-clear'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.ink,
+                      backgroundColor: AppColors.peach,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadii.field),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    onPressed: _clearSearch,
+                    child: const Text('Clear'),
+                  ),
+                ],
+              ],
+            ),
+            if (query.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                events.isEmpty
+                    ? 'No events match. Clear the search to see every event again.'
+                    : events.length == 1
+                    ? '1 event matches. Other events are hidden until you clear the search.'
+                    : '${events.length} events match. Other events are hidden until you clear the search.',
+                style: const TextStyle(
+                  color: AppColors.ink,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  height: 1.35,
+                ),
+              ),
+            ],
             if (!searching) ...[
+              const SizedBox(height: 18),
               Row(
                 children: [
                   Container(
@@ -139,11 +212,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const Spacer(),
-                  _RoundIconButton(
-                    icon: Icons.search_rounded,
-                    onTap: () => _searchFocus.requestFocus(),
-                  ),
-                  const SizedBox(width: 8),
                   ListenableBuilder(
                     listenable: session,
                     builder: (context, _) {
@@ -183,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(
                 employee == null
                     ? 'Select an official provincial event to check in.'
-                    : 'Device bound to ${employee.deviceName}',
+                    : 'This phone is registered for your attendance.',
                 style: const TextStyle(color: AppColors.muted, height: 1.4),
               ),
               const SizedBox(height: 14),
@@ -192,44 +260,6 @@ class _HomeScreenState extends State<HomeScreen> {
               const AppVector(AppVectors.heroAttendance, height: 112),
               const SizedBox(height: 18),
             ],
-            Row(
-              children: [
-                if (searching)
-                  IconButton(
-                    key: const Key('home-search-back'),
-                    tooltip: 'Close search',
-                    onPressed: _closeSearch,
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 18,
-                    ),
-                  )
-                else
-                  const SizedBox.shrink(),
-                Expanded(
-                  child: TextField(
-                    key: const Key('home-search'),
-                    controller: _searchController,
-                    focusNode: _searchFocus,
-                    onChanged: session.updateSearch,
-                    onSubmitted: (_) => _searchFocus.unfocus(),
-                    textInputAction: TextInputAction.search,
-                    decoration: InputDecoration(
-                      hintText: 'Search events or venues',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      suffixIcon: session.searchQuery.trim().isEmpty
-                          ? null
-                          : IconButton(
-                              key: const Key('home-search-clear'),
-                              tooltip: 'Clear search',
-                              icon: const Icon(Icons.close_rounded),
-                              onPressed: _clearSearch,
-                            ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
             if (!searching) ...[
               const SizedBox(height: 12),
               SizedBox(
@@ -278,19 +308,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
             const SizedBox(height: 14),
-            if (searching)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: Text(
-                  '${events.length} found',
-                  style: const TextStyle(
-                    color: AppColors.muted,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-              )
-            else
+            if (query.isEmpty)
               Row(
                 children: [
                   const Text(
@@ -337,18 +355,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: EdgeInsets.symmetric(vertical: 48),
                 child: Center(child: CircularProgressIndicator()),
               )
-            else if (events.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 48),
-                child: Center(
-                  child: Text(
-                    session.searchQuery.trim().isEmpty &&
-                            session.statusFilter == null &&
-                            !searching
-                        ? 'No published events yet.'
-                        : 'No events match your search.',
-                  ),
-                ),
+            else if (events.isEmpty && query.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 48),
+                child: Center(child: Text('No published events yet.')),
               )
             else
               ...events.map((event) {
@@ -506,35 +516,6 @@ class _CategoryTile extends StatelessWidget {
   }
 }
 
-class _RoundIconButton extends StatelessWidget {
-  const _RoundIconButton({required this.icon, required this.onTap});
-
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: Container(
-          width: 42,
-          height: 42,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: AppShadows.lighter,
-          ),
-          child: Icon(icon, size: 20, color: AppColors.ink),
-        ),
-      ),
-    );
-  }
-}
-
 class _NotificationButton extends StatelessWidget {
   const _NotificationButton({required this.unreadCount, required this.onTap});
 
@@ -626,11 +607,11 @@ class _OfflineSyncBanner extends StatelessWidget {
             child: Text(
               pending == 0
                   ? (online
-                        ? 'Online · local attendance is synced'
-                        : 'Offline · new check-ins stay on this device')
+                        ? 'Online. PHRMO has your saved attendance.'
+                        : 'No internet. New check-ins stay on this phone.')
                   : (online
-                        ? '$pending pending · uploading automatically'
-                        : '$pending pending · saved offline until connectivity returns'),
+                        ? '$pending still on this phone. They will be sent automatically.'
+                        : '$pending saved on this phone until you have internet.'),
               style: const TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 13,

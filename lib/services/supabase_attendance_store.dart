@@ -19,10 +19,13 @@ id, event_id, check_in_at, check_out_at,
 check_in_latitude, check_in_longitude, check_out_latitude, check_out_longitude,
 geofence_verified, biometric_verified, verification_status, attendance_status,
 recorded_offline, sync_status, client_record_id, client_recorded_at, synced_at,
+check_in_accuracy_m, check_out_accuracy_m, check_in_mocked, check_out_mocked,
+check_in_static, check_out_static, check_in_time_source, check_out_time_source,
+integrity_status,
 events!event_id (id, name, description, event_date, start_time, end_time, venue, latitude, longitude, geofence_radius_meters, status, requires_check_out)
 ''';
   static const _upsertSelect =
-      'id, synced_at, attendance_status, verification_status, sync_status, client_record_id';
+      'id, synced_at, attendance_status, verification_status, sync_status, client_record_id, geofence_verified, integrity_status';
 
   @override
   Future<AttendanceRecord> upsert(AttendanceRecord record) async {
@@ -138,11 +141,7 @@ events!event_id (id, name, description, event_date, start_time, end_time, venue,
   }) async {
     final row = await _client
         .from('attendance_records')
-        .update({
-          'check_out_at': record.checkOutAt!.toUtc().toIso8601String(),
-          'check_out_latitude': record.checkOutLatitude,
-          'check_out_longitude': record.checkOutLongitude,
-        })
+        .update(attendanceCheckOutPayload(record))
         .eq('id', existing.serverId ?? existing.clientRecordId)
         .select(_upsertSelect)
         .single()
@@ -152,6 +151,10 @@ events!event_id (id, name, description, event_date, start_time, end_time, venue,
         checkOutAt: record.checkOutAt,
         checkOutLatitude: record.checkOutLatitude,
         checkOutLongitude: record.checkOutLongitude,
+        checkOutAccuracyMeters: record.checkOutAccuracyMeters,
+        checkOutMocked: record.checkOutMocked,
+        checkOutStatic: record.checkOutStatic,
+        checkOutTimeSource: record.checkOutTimeSource,
         attendanceStatus: AttendanceStatus.present,
       ),
       row,
@@ -167,8 +170,27 @@ events!event_id (id, name, description, event_date, start_time, end_time, venue,
       syncStatus: SyncStatus.synced,
       syncedAt: parseAttendanceTime(row['synced_at']) ?? DateTime.now().toUtc(),
       attendanceStatus: parseAttendanceStatus(row['attendance_status']),
+      verificationStatus: row.containsKey('verification_status')
+          ? parseVerificationStatus(row['verification_status'])
+          : null,
+      geofenceVerified: row['geofence_verified'] as bool?,
+      integrityStatus: row.containsKey('integrity_status')
+          ? IntegrityStatusDb.parse(row['integrity_status'])
+          : null,
     );
   }
+}
+
+Map<String, Object?> attendanceCheckOutPayload(AttendanceRecord record) {
+  return {
+    'check_out_at': record.checkOutAt?.toUtc().toIso8601String(),
+    'check_out_latitude': record.checkOutLatitude,
+    'check_out_longitude': record.checkOutLongitude,
+    'check_out_accuracy_m': record.checkOutAccuracyMeters,
+    'check_out_mocked': record.checkOutMocked,
+    'check_out_static': record.checkOutStatic,
+    'check_out_time_source': record.checkOutTimeSource?.dbName,
+  };
 }
 
 Map<String, Object?> attendanceInsertPayload({
@@ -193,6 +215,11 @@ Map<String, Object?> attendanceInsertPayload({
     'recorded_offline': record.recordedOffline,
     'client_record_id': record.clientRecordId,
     'client_recorded_at': record.clientRecordedAt.toUtc().toIso8601String(),
+    'check_in_accuracy_m': record.checkInAccuracyMeters,
+    'check_in_mocked': record.checkInMocked,
+    'check_in_static': record.checkInStatic,
+    'check_in_time_source': record.checkInTimeSource?.dbName,
+    ...attendanceCheckOutPayload(record),
   };
 }
 
@@ -240,6 +267,15 @@ AttendanceRecord? attendanceRecordFromSupabaseRow(
     clientRecordedAt:
         parseAttendanceTime(row['client_recorded_at']) ?? checkInAt,
     syncedAt: parseAttendanceTime(row['synced_at']),
+    checkInAccuracyMeters: _asDouble(row['check_in_accuracy_m']),
+    checkOutAccuracyMeters: _asDouble(row['check_out_accuracy_m']),
+    checkInMocked: row['check_in_mocked'] == true,
+    checkOutMocked: row['check_out_mocked'] == true,
+    checkInStatic: row['check_in_static'] == true,
+    checkOutStatic: row['check_out_static'] == true,
+    checkInTimeSource: TimeSourceDb.parse(row['check_in_time_source']),
+    checkOutTimeSource: TimeSourceDb.parse(row['check_out_time_source']),
+    integrityStatus: IntegrityStatusDb.parse(row['integrity_status']),
   );
 }
 

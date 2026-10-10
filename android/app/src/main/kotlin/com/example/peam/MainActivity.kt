@@ -13,5 +13,11 @@ class MainActivity : FlutterFragmentActivity() {
         ).setMethodCallHandler { call, result ->
             PeamBiometrics.handle(this, call, result)
         }
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            PeamDeviceGuard.CHANNEL,
+        ).setMethodCallHandler { call, result ->
+            PeamDeviceGuard.handle(this, call, result)
+        }
     }
 }

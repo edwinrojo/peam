@@ -129,13 +129,6 @@ class EventCard extends StatelessWidget {
                         icon: Icons.schedule_outlined,
                         label: event.scheduleLabel,
                       ),
-                      if (event.requiresCheckOut) ...[
-                        const SizedBox(height: 4),
-                        const _Meta(
-                          icon: Icons.logout_rounded,
-                          label: 'Check-out required',
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -143,6 +136,10 @@ class EventCard extends StatelessWidget {
                 _ActionBadge(label: actionLabel),
               ],
             ),
+            if (event.requiresCheckOut) ...[
+              const SizedBox(height: 10),
+              const _CheckOutNotice(),
+            ],
           ],
         ),
       ),
@@ -241,6 +238,39 @@ class _ActionBadge extends StatelessWidget {
               color: style.foreground,
               fontWeight: FontWeight.w800,
               fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CheckOutNotice extends StatelessWidget {
+  const _CheckOutNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.peach,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.logout_rounded, size: 16, color: AppColors.peachDeep),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Check-out required. Check out before you leave.',
+              style: TextStyle(
+                color: AppColors.peachDeep,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                height: 1.3,
+              ),
             ),
           ),
         ],

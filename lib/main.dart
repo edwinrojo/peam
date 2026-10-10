@@ -7,11 +7,13 @@ import 'package:workmanager/workmanager.dart';
 
 import 'app.dart';
 import 'firebase_options.dart';
+import 'services/attendance_integrity.dart';
 import 'services/attendance_stores.dart';
 import 'services/auth_session_store.dart';
 import 'services/background_attendance_sync.dart';
 import 'services/biometric_auth_service.dart';
 import 'services/connectivity_controller.dart';
+import 'services/device_guard.dart';
 import 'services/employee_auth_api.dart';
 import 'services/events_catalog.dart';
 import 'services/fcm_push_service.dart';
@@ -22,6 +24,7 @@ import 'services/push_notification_service.dart';
 import 'services/sqlite_attendance_database.dart';
 import 'services/supabase_attendance_store.dart';
 import 'services/supabase_config.dart';
+import 'services/trusted_clock.dart';
 import 'state/session_controller.dart';
 
 @pragma('vm:entry-point')
@@ -76,6 +79,8 @@ Future<void> main() async {
         : MemoryAttendanceRemoteStore.withDemoSeed();
   }
 
+  const deviceGuard = MethodChannelDeviceGuard();
+
   runApp(
     PeamApp(
       pushNotifications: pushNotifications,
@@ -93,6 +98,14 @@ Future<void> main() async {
         notificationInbox: FileNotificationInbox(),
         liveNotifications: SupabaseConfig.isConfigured
             ? LiveNotificationSource()
+            : null,
+        deviceGuard: deviceGuard,
+        trustedClock: TrustedClock(
+          guard: deviceGuard,
+          store: FileClockAnchorStore(),
+        ),
+        integrityApi: SupabaseConfig.isConfigured
+            ? SupabaseAttendanceIntegrityApi()
             : null,
       ),
     ),

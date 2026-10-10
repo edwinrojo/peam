@@ -6,6 +6,44 @@ enum VerificationStatus { pending, verified, failed }
 
 enum SyncStatus { pending, synced }
 
+/// Play Integrity result, written only by the `verify-integrity` function.
+enum IntegrityStatus { unchecked, passed, appUnrecognized, failed, unavailable }
+
+/// Where an attendance timestamp came from (`public.time_source`).
+enum TimeSource { serverAnchor, deviceClock }
+
+extension IntegrityStatusDb on IntegrityStatus {
+  String get dbName => switch (this) {
+    IntegrityStatus.appUnrecognized => 'app_unrecognized',
+    _ => name,
+  };
+
+  static IntegrityStatus parse(Object? value) {
+    final raw = value?.toString().trim().toLowerCase();
+    return IntegrityStatus.values.firstWhere(
+      (status) => status.dbName == raw,
+      orElse: () => IntegrityStatus.unchecked,
+    );
+  }
+}
+
+extension TimeSourceDb on TimeSource {
+  String get dbName => switch (this) {
+    TimeSource.serverAnchor => 'server_anchor',
+    TimeSource.deviceClock => 'device_clock',
+  };
+
+  static TimeSource? parse(Object? value) {
+    final raw = value?.toString().trim().toLowerCase();
+    for (final source in TimeSource.values) {
+      if (source.dbName == raw) {
+        return source;
+      }
+    }
+    return null;
+  }
+}
+
 class Department {
   const Department({required this.name, required String code})
     : code = code == 'HRMDO' ? 'PHRMO' : code;
@@ -329,6 +367,15 @@ class AttendanceRecord {
     this.attendanceStatus = AttendanceStatus.incomplete,
     this.syncStatus = SyncStatus.pending,
     this.syncedAt,
+    this.checkInAccuracyMeters,
+    this.checkOutAccuracyMeters,
+    this.checkInMocked = false,
+    this.checkOutMocked = false,
+    this.checkInStatic = false,
+    this.checkOutStatic = false,
+    this.checkInTimeSource,
+    this.checkOutTimeSource,
+    this.integrityStatus = IntegrityStatus.unchecked,
   });
 
   /// Device-generated UUID used as the offline idempotency key (`client_record_id`).
@@ -350,13 +397,23 @@ class AttendanceRecord {
   final SyncStatus syncStatus;
   final DateTime clientRecordedAt;
   final DateTime? syncedAt;
+  final double? checkInAccuracyMeters;
+  final double? checkOutAccuracyMeters;
+  final bool checkInMocked;
+  final bool checkOutMocked;
+  final bool checkInStatic;
+  final bool checkOutStatic;
+  final TimeSource? checkInTimeSource;
+  final TimeSource? checkOutTimeSource;
+  final IntegrityStatus integrityStatus;
 
   bool get isPending => syncStatus == SyncStatus.pending;
 
+  bool get needsReview => verificationStatus == VerificationStatus.failed;
+
   String get syncLabel => switch (syncStatus) {
-    SyncStatus.pending =>
-      recordedOffline ? 'Pending · recorded offline' : 'Pending',
-    SyncStatus.synced => 'Synced',
+    SyncStatus.pending => 'Pending — saved on this phone',
+    SyncStatus.synced => 'Synced — sent to PHRMO',
   };
 
   AttendanceRecord copyWith({
@@ -369,6 +426,13 @@ class AttendanceRecord {
     AttendanceStatus? attendanceStatus,
     SyncStatus? syncStatus,
     DateTime? syncedAt,
+    bool? geofenceVerified,
+    VerificationStatus? verificationStatus,
+    double? checkOutAccuracyMeters,
+    bool? checkOutMocked,
+    bool? checkOutStatic,
+    TimeSource? checkOutTimeSource,
+    IntegrityStatus? integrityStatus,
   }) {
     return AttendanceRecord(
       clientRecordId: clientRecordId,
@@ -382,13 +446,23 @@ class AttendanceRecord {
       checkOutLatitude: checkOutLatitude ?? this.checkOutLatitude,
       checkOutLongitude: checkOutLongitude ?? this.checkOutLongitude,
       recordedOffline: recordedOffline ?? this.recordedOffline,
-      geofenceVerified: geofenceVerified,
+      geofenceVerified: geofenceVerified ?? this.geofenceVerified,
       biometricVerified: biometricVerified,
-      verificationStatus: verificationStatus,
+      verificationStatus: verificationStatus ?? this.verificationStatus,
       attendanceStatus: attendanceStatus ?? this.attendanceStatus,
       syncStatus: syncStatus ?? this.syncStatus,
       clientRecordedAt: clientRecordedAt,
       syncedAt: syncedAt ?? this.syncedAt,
+      checkInAccuracyMeters: checkInAccuracyMeters,
+      checkOutAccuracyMeters:
+          checkOutAccuracyMeters ?? this.checkOutAccuracyMeters,
+      checkInMocked: checkInMocked,
+      checkOutMocked: checkOutMocked ?? this.checkOutMocked,
+      checkInStatic: checkInStatic,
+      checkOutStatic: checkOutStatic ?? this.checkOutStatic,
+      checkInTimeSource: checkInTimeSource,
+      checkOutTimeSource: checkOutTimeSource ?? this.checkOutTimeSource,
+      integrityStatus: integrityStatus ?? this.integrityStatus,
     );
   }
 }

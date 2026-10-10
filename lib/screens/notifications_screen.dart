@@ -89,7 +89,7 @@ class _EmptyNotifications extends StatelessWidget {
           ),
           SizedBox(height: 6),
           Text(
-            'PEAM will notify you here when HR publishes or updates an event, when a reminder is due, and when a device-change request is reviewed.',
+            'PEAM will notify you here when PHRMO publishes or updates an event, when a reminder is due, when a check-out is still needed, and when a request to use a new phone is reviewed.',
             textAlign: TextAlign.center,
             style: TextStyle(color: AppColors.muted, height: 1.4),
           ),
@@ -108,6 +108,7 @@ class _NotificationTile extends StatelessWidget {
   IconData get _icon => switch (notification.kind) {
     NotificationKind.eventPublished => Icons.event_available_outlined,
     NotificationKind.eventReminder => Icons.alarm_outlined,
+    NotificationKind.checkOutReminder => Icons.logout_rounded,
     NotificationKind.deviceChangeUpdate => Icons.phonelink_setup_outlined,
     NotificationKind.attendanceSync => Icons.cloud_upload_outlined,
     NotificationKind.adminNotice => Icons.campaign_outlined,
@@ -116,6 +117,7 @@ class _NotificationTile extends StatelessWidget {
   Color get _tint => switch (notification.kind) {
     NotificationKind.eventPublished => AppColors.mint,
     NotificationKind.eventReminder => AppColors.peach,
+    NotificationKind.checkOutReminder => AppColors.peach,
     NotificationKind.deviceChangeUpdate => AppColors.sky,
     NotificationKind.attendanceSync => AppColors.lavender,
     NotificationKind.adminNotice => AppColors.line,

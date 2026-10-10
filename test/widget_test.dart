@@ -85,7 +85,10 @@ SUPABASE_ANON_KEY=sb_publishable_test_key
 
     expect(find.text('Official events'), findsOneWidget);
     expect(find.text('Provincial Employees Assembly 2026'), findsOneWidget);
-    expect(find.text('Check-out required'), findsWidgets);
+    expect(
+      find.text('Check-out required. Check out before you leave.'),
+      findsWidgets,
+    );
     expect(find.text('Check-in'), findsWidgets);
     expect(
       find.text('Good day, ${SampleData.demoEmployee.firstName}'),
@@ -137,7 +140,10 @@ SUPABASE_ANON_KEY=sb_publishable_test_key
 
     expect(find.text('Attendance confirmed'), findsOneWidget);
     expect(find.text(SampleData.demoEmployee.fullName), findsOneWidget);
-    expect(find.text('Geofence and biometric verified'), findsOneWidget);
+    expect(
+      find.text('You were at the venue, and this phone confirmed it is you.'),
+      findsOneWidget,
+    );
     expect(find.textContaining('Pending'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('confirmation-done')));
@@ -198,11 +204,11 @@ SUPABASE_ANON_KEY=sb_publishable_test_key
     expect(find.text('Outside the event area'), findsOneWidget);
     expect(
       find.text(
-        'Move inside the 120 m geofence, then recheck your location.',
+        'Move inside the event area (within 120 m of the venue), then check your location again.',
       ),
       findsOneWidget,
     );
-    expect(find.text('Recheck location'), findsOneWidget);
+    expect(find.text('Check location again'), findsOneWidget);
     expect(find.text('Verify it is you'), findsNothing);
 
     await tester.tap(find.byKey(const Key('check-in-button')));
@@ -274,7 +280,7 @@ SUPABASE_ANON_KEY=sb_publishable_test_key
     await _loginAsDemo(tester);
 
     expect(
-      find.text('Offline · new check-ins stay on this device'),
+      find.text('No internet. New check-ins stay on this phone.'),
       findsOneWidget,
     );
 
@@ -329,11 +335,20 @@ SUPABASE_ANON_KEY=sb_publishable_test_key
     expect(find.text('Provincial Employees Assembly 2026'), findsNothing);
     expect(find.byKey(const Key('filter-ongoing')), findsNothing);
     expect(find.text('Attendance Made Simple'), findsNothing);
-    expect(find.byKey(const Key('home-search-clear')), findsOneWidget);
+    expect(find.text('Clear'), findsOneWidget);
+    expect(
+      find.text(
+        '1 event matches. Other events are hidden until you clear the search.',
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const Key('home-search-clear')));
     await tester.pump();
 
+    expect(find.text('Clear'), findsNothing);
+    expect(find.text('Provincial Employees Assembly 2026'), findsOneWidget);
+    expect(find.text('Barangay Health Outreach'), findsOneWidget);
     expect(find.byKey(const Key('home-search')), findsOneWidget);
     expect(
       tester
@@ -490,7 +505,7 @@ SUPABASE_ANON_KEY=sb_publishable_test_key
 
     expect(find.text('Profile'), findsWidgets);
     expect(find.text(SampleData.demoEmployee.fullName), findsOneWidget);
-    expect(find.text('Binding'), findsOneWidget);
+    expect(find.text('Registration'), findsOneWidget);
     expect(session.shellTab, 2);
   });
 

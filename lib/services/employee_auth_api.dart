@@ -100,7 +100,7 @@ class EmployeeAuthApi {
         return RemoteVerifyResult(
           error:
               data['message'] as String? ??
-              'This account is already bound to another phone. Submit a device-change request for HR approval.',
+              'This account is already registered on another phone. Ask PHRMO to approve this phone.',
           deviceChangeRequired: true,
           changeTicket: data['change_ticket'] as String?,
         );
@@ -120,7 +120,7 @@ class EmployeeAuthApi {
       if (_resolved.auth.currentSession == null) {
         return const RemoteVerifyResult(
           error:
-              'Signed in, but this device could not keep the session. Try again.',
+              'Signed in, but this phone could not keep you signed in. Try again.',
         );
       }
 
@@ -150,7 +150,7 @@ class EmployeeAuthApi {
       final data = _map(response.data);
       if (response.status >= 400 || data['submitted'] != true) {
         return data['error'] as String? ??
-            'Could not submit the device-change request.';
+            'Could not send the request. Try again.';
       }
       return null;
     } on FunctionException catch (error) {
@@ -208,7 +208,7 @@ class EmployeeAuthApi {
       ),
       phone: _nullableString(profile['phone']),
       deviceUid: boundUid,
-      deviceName: _nullableString(device?['device_name']) ?? 'This device',
+      deviceName: _nullableString(device?['device_name']) ?? 'This phone',
     );
   }
 
@@ -261,7 +261,7 @@ Employee employeeFromAuthPayload(Map<String, dynamic> json) {
     ),
     phone: _nullableString(json['phone']),
     deviceUid: _nullableString(json['device_uid']),
-    deviceName: _nullableString(json['device_name']) ?? 'This device',
+    deviceName: _nullableString(json['device_name']) ?? 'This phone',
   );
 }
 

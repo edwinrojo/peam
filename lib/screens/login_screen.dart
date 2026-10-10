@@ -159,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       key: const Key('login-button'),
                       label: challenge == null
                           ? 'Send email code'
-                          : 'Verify and bind this phone',
+                          : 'Verify and register this phone',
                       icon: challenge == null
                           ? Icons.mail_outline
                           : Icons.verified_user_outlined,
@@ -174,7 +174,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Padding(
                     padding: EdgeInsets.fromLTRB(24, 0, 24, 16),
                     child: Text(
-                      'PHRMO creates employee accounts. This phone is bound after the first successful sign-in.',
+                      'PHRMO creates employee accounts. This phone is registered for you after the first sign-in.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: AppColors.muted, height: 1.4),
                     ),
@@ -220,7 +220,7 @@ class _EmployeeIdStep extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         const Text(
-          'Enter your Employee ID. PEAM sends a one-time code to the work email PHRMO stored for you.',
+          'Enter your Employee ID. PEAM sends a code to the work email PHRMO has for you.',
           style: TextStyle(color: AppColors.muted, height: 1.4),
         ),
         const SizedBox(height: 18),
@@ -379,7 +379,7 @@ class _CodeStep extends StatelessWidget {
           TextButton(
             key: const Key('login-device-change'),
             onPressed: onRequestDeviceChange,
-            child: const Text('Submit a device-change request'),
+            child: const Text('Ask PHRMO to use this phone'),
           ),
       ],
     );

@@ -160,8 +160,14 @@ AttendanceRecord mergeAttendanceRecords(
 ) {
   final keepLocalCheckout =
       existing.checkOutAt != null && incoming.checkOutAt == null;
+  final integrityStatus = incoming.integrityStatus == IntegrityStatus.unchecked
+      ? existing.integrityStatus
+      : incoming.integrityStatus;
   if (keepLocalCheckout) {
-    return existing.copyWith(serverId: incoming.serverId ?? existing.serverId);
+    return existing.copyWith(
+      serverId: incoming.serverId ?? existing.serverId,
+      integrityStatus: integrityStatus,
+    );
   }
 
   final checkOutAt = incoming.checkOutAt ?? existing.checkOutAt;
@@ -169,7 +175,9 @@ AttendanceRecord mergeAttendanceRecords(
       incoming.checkOutAt == null &&
       existing.checkOutAt == null &&
       incoming.syncStatus == existing.syncStatus &&
-      incoming.attendanceStatus == existing.attendanceStatus;
+      incoming.attendanceStatus == existing.attendanceStatus &&
+      incoming.verificationStatus == existing.verificationStatus &&
+      integrityStatus == existing.integrityStatus;
   if (incomingIsDuplicateCheckIn) {
     return existing;
   }
@@ -193,5 +201,17 @@ AttendanceRecord mergeAttendanceRecords(
     syncStatus: incoming.syncStatus,
     clientRecordedAt: existing.clientRecordedAt,
     syncedAt: incoming.syncedAt ?? existing.syncedAt,
+    checkInAccuracyMeters:
+        existing.checkInAccuracyMeters ?? incoming.checkInAccuracyMeters,
+    checkOutAccuracyMeters:
+        incoming.checkOutAccuracyMeters ?? existing.checkOutAccuracyMeters,
+    checkInMocked: existing.checkInMocked || incoming.checkInMocked,
+    checkOutMocked: existing.checkOutMocked || incoming.checkOutMocked,
+    checkInStatic: existing.checkInStatic || incoming.checkInStatic,
+    checkOutStatic: existing.checkOutStatic || incoming.checkOutStatic,
+    checkInTimeSource: existing.checkInTimeSource ?? incoming.checkInTimeSource,
+    checkOutTimeSource:
+        incoming.checkOutTimeSource ?? existing.checkOutTimeSource,
+    integrityStatus: integrityStatus,
   );
 }

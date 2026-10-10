@@ -25,7 +25,7 @@ abstract final class SampleNotifications {
       id: 'n-device-approved',
       title: 'Device-change request approved',
       body:
-          'PHRMO approved your request. You may bind your new phone as your attendance device.',
+          'PHRMO approved your request. Sign in on the new phone to use it for attendance.',
       kind: NotificationKind.deviceChangeUpdate,
       createdAt: DateTime(2026, 8, 22, 11, 5),
       isRead: true,

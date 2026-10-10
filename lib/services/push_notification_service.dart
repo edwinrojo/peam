@@ -56,7 +56,16 @@ class PushNotificationService {
           .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin
           >();
+      await androidPlugin?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'peam_attendance',
+          'PEAM Attendance',
+          description: 'Event, reminder, and attendance notices for PEAM.',
+          importance: Importance.high,
+        ),
+      );
       await androidPlugin?.requestNotificationsPermission();
+      await androidPlugin?.requestExactAlarmsPermission();
 
       final iosPlugin = _plugin
           .resolvePlatformSpecificImplementation<
@@ -108,15 +117,29 @@ class PushNotificationService {
     if (!_ready || !when.isAfter(DateTime.now())) {
       return;
     }
-    await _plugin.zonedSchedule(
-      id: id,
-      title: title,
-      body: body,
-      scheduledDate: tz.TZDateTime.from(when, tz.local),
-      notificationDetails: _details,
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      payload: payload,
-    );
+    final scheduledDate = tz.TZDateTime.from(when, tz.local);
+    try {
+      await _plugin.zonedSchedule(
+        id: id,
+        title: title,
+        body: body,
+        scheduledDate: scheduledDate,
+        notificationDetails: _details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: payload,
+      );
+    } catch (error) {
+      debugPrint('PEAM exact reminder failed: $error');
+      await _plugin.zonedSchedule(
+        id: id,
+        title: title,
+        body: body,
+        scheduledDate: scheduledDate,
+        notificationDetails: _details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        payload: payload,
+      );
+    }
   }
 
   Future<void> cancel(int id) async {

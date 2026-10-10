@@ -163,7 +163,7 @@ void main() {
       expect(error, isNull);
 
       session.selectEvent(SampleData.events.first);
-      await session.confirmAttendance(checkInAt: DateTime(2026, 8, 25, 8, 15));
+      await session.confirmAttendance(checkInAt: _onAssemblyDay(8, 15));
 
       expect(session.pendingCount, 1);
       expect(session.history.single.isPending, isTrue);
@@ -197,7 +197,7 @@ void main() {
       expect(error, isNull);
 
       session.selectEvent(SampleData.events.first);
-      await session.confirmAttendance(checkInAt: DateTime(2026, 8, 25, 8, 15));
+      await session.confirmAttendance(checkInAt: _onAssemblyDay(8, 15));
       expect(session.pendingCount, 1);
       expect(await remote.listForEmployee(SampleData.demoEmployee), isEmpty);
 
@@ -240,40 +240,45 @@ void main() {
     expect(session.lastAttendance?.event.id, isNot('evt-health'));
   });
 
-  test('check-in is present when the event does not require check-out', () async {
-    final session = SessionController(
-      localStore: MemoryAttendanceLocalStore(),
-      remoteStore: MemoryAttendanceRemoteStore(),
-      connectivity: ConnectivityController(),
-      pushNotifications: PushNotificationService(enableSystemBanners: false),
-    );
-    addTearDown(session.dispose);
+  test(
+    'check-in is present when the event does not require check-out',
+    () async {
+      final session = SessionController(
+        localStore: MemoryAttendanceLocalStore(),
+        remoteStore: MemoryAttendanceRemoteStore(),
+        connectivity: ConnectivityController(),
+        pushNotifications: PushNotificationService(enableSystemBanners: false),
+      );
+      addTearDown(session.dispose);
 
-    final error = await session.completePrototypeLogin(
-      SampleData.demoEmployee.employeeNumber,
-    );
-    expect(error, isNull);
+      final error = await session.completePrototypeLogin(
+        SampleData.demoEmployee.employeeNumber,
+      );
+      expect(error, isNull);
 
-    final now = DateTime.now();
-    session.selectEvent(
-      ProvincialEvent(
-        id: 'evt-no-checkout',
-        name: 'Flag ceremony',
-        description: '',
-        eventDate: DateTime(now.year, now.month, now.day),
-        startTime: '8:00 AM',
-        endTime: '11:59 PM',
-        venue: 'Capitol',
-        location: SampleData.capitol,
-        status: EventStatus.ongoing,
-      ),
-    );
-    await session.confirmAttendance(checkInAt: DateTime(now.year, now.month, now.day, 9));
+      final now = DateTime.now();
+      session.selectEvent(
+        ProvincialEvent(
+          id: 'evt-no-checkout',
+          name: 'Flag ceremony',
+          description: '',
+          eventDate: DateTime(now.year, now.month, now.day),
+          startTime: '8:00 AM',
+          endTime: '11:59 PM',
+          venue: 'Capitol',
+          location: SampleData.capitol,
+          status: EventStatus.ongoing,
+        ),
+      );
+      await session.confirmAttendance(
+        checkInAt: DateTime(now.year, now.month, now.day, 9),
+      );
 
-    expect(session.history, hasLength(1));
-    expect(session.history.single.attendanceStatus, AttendanceStatus.present);
-    expect(session.history.single.checkOutAt, isNull);
-  });
+      expect(session.history, hasLength(1));
+      expect(session.history.single.attendanceStatus, AttendanceStatus.present);
+      expect(session.history.single.checkOutAt, isNull);
+    },
+  );
 
   test('check-out updates the same attendance row to present', () async {
     final session = SessionController(
@@ -290,13 +295,16 @@ void main() {
     expect(error, isNull);
 
     session.selectEvent(SampleData.events.first);
-    await session.confirmAttendance(checkInAt: DateTime(2026, 8, 25, 8, 15));
-    expect(session.history.single.attendanceStatus, AttendanceStatus.incomplete);
+    await session.confirmAttendance(checkInAt: _onAssemblyDay(8, 15));
+    expect(
+      session.history.single.attendanceStatus,
+      AttendanceStatus.incomplete,
+    );
 
-    await session.confirmCheckOut(checkOutAt: DateTime(2026, 8, 25, 11, 30));
+    await session.confirmCheckOut(checkOutAt: _onAssemblyDay(11, 30));
 
     expect(session.history, hasLength(1));
-    expect(session.history.single.checkOutAt, DateTime(2026, 8, 25, 11, 30));
+    expect(session.history.single.checkOutAt, _onAssemblyDay(11, 30));
     expect(session.history.single.attendanceStatus, AttendanceStatus.present);
     expect(session.history.single.isPending, isTrue);
 
@@ -369,4 +377,9 @@ class _ThrowingRemoteStore implements AttendanceRemoteStore {
   Future<List<AttendanceRecord>> listForEmployee(Employee employee) async {
     return const [];
   }
+}
+
+DateTime _onAssemblyDay(int hour, int minute) {
+  final day = SampleData.events.first.eventDate;
+  return DateTime(day.year, day.month, day.day, hour, minute);
 }
