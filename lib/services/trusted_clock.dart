@@ -101,11 +101,10 @@ class FileClockAnchorStore implements ClockAnchorStore {
 /// clock (and says so) after a reboot or before the first server contact.
 class TrustedClock {
   TrustedClock({
-    required DeviceGuard guard,
+    required this._guard,
     ClockAnchorStore? store,
     DateTime Function()? deviceNow,
-  }) : _guard = guard,
-       _store = store ?? MemoryClockAnchorStore(),
+  }) : _store = store ?? MemoryClockAnchorStore(),
        _deviceNow = deviceNow ?? DateTime.now;
 
   final DeviceGuard _guard;

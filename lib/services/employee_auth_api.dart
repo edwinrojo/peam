@@ -32,7 +32,7 @@ class AuthBindingException implements Exception {
 }
 
 class EmployeeAuthApi {
-  EmployeeAuthApi({SupabaseClient? client}) : _client = client;
+  EmployeeAuthApi({this._client});
 
   static const _networkTimeout = Duration(seconds: 8);
 

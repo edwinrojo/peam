@@ -21,7 +21,7 @@ abstract class AttendanceIntegrityApi {
 }
 
 class SupabaseAttendanceIntegrityApi implements AttendanceIntegrityApi {
-  SupabaseAttendanceIntegrityApi({SupabaseClient? client}) : _client = client;
+  SupabaseAttendanceIntegrityApi({this._client});
 
   final SupabaseClient? _client;
 
