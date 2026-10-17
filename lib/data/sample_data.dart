@@ -50,7 +50,7 @@ abstract final class SampleData {
       description:
           'Annual assembly of provincial government employees at the Capitol grounds. Attendance is required for all regular plantilla personnel.',
       eventDate: _today,
-      startTime: '8:00 AM',
+      startTime: '12:00 AM',
       endTime: '11:59 PM',
       venue: 'Provincial Capitol Grounds, Digos City',
       location: capitol,
