@@ -10,6 +10,8 @@ After a successful GitHub Actions build on `main`, the release APK is published 
 
 That link always points at the newest build. You can also open [Releases](https://github.com/edwinrojo/peam/releases/latest).
 
+The landing page at **[edwinrojo.github.io/peam](https://edwinrojo.github.io/peam/)** has a QR code for the same link. Its source is `site/`, deployed by the **Deploy landing page** workflow. Enable it once under **Settings → Pages → Source: GitHub Actions**.
+
 Branch and pull-request builds still attach an APK under the workflow run (**Actions → Build Android APK → Artifacts**). Those expire; the Release file does not.
 
 Sign in shows **Demo** when the APK was built without real Supabase keys. GitHub cannot use your local `.env` (it is gitignored). Add repository secrets `SUPABASE_URL` and `SUPABASE_ANON_KEY` (same values as `.env`), then rebuild. Optional: `GOOGLE_MAPS_API_KEY`. Until those secrets exist, install a local build instead:

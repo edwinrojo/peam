@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PEAM-Registry · Provincial Event Attendance and Mobile Registry</title>
+  <meta name="description" content="PEAM-Registry is the Android attendance app for employees of the Provincial Government of Davao del Sur. Check in at events with GPS and fingerprint or face, even offline.">
+  <meta name="theme-color" content="#7B61FF">
+  <meta property="og:title" content="PEAM-Registry">
+  <meta property="og:description" content="Event attendance verified by location and biometrics. Download the Android app.">
+  <meta property="og:image" content="assets/app_icon.png">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="apple-touch-icon" href="assets/favicon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="nav">
+    <div class="container nav-inner">
+      <a class="brand" href="#top" aria-label="PEAM-Registry home">
+        <img src="assets/favicon.png" alt="" width="36" height="36">
+        <span>PEAM<span class="brand-dim">-Registry</span></span>
+      </a>
+      <nav class="nav-links" aria-label="Main">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="#install">Install</a>
+        <a class="nav-cta" href="https://github.com/edwinrojo/peam">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">Provincial Government of Davao del Sur</p>
+          <h1>Event attendance,<br><span class="grad">verified on your phone.</span></h1>
+          <p class="lead">
+            PEAM-Registry (Provincial Event Attendance and Mobile Registry) lets employees check in
+            at provincial events in seconds. The app confirms you are at the venue and that it is
+            really you, then sends your attendance straight to PHRMO.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-dark" href="https://github.com/edwinrojo/peam/releases/latest/download/peam-release.apk">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14"/></svg>
+              Download for Android
+            </a>
+            <a class="btn btn-light" href="https://github.com/edwinrojo/peam/releases/tag/latest-apk">Release notes</a>
+          </div>
+          <p class="build-meta" id="build-meta">Latest build from GitHub Actions · Android 7.0 or newer</p>
+        </div>
+
+        <aside class="qr-card" aria-label="Scan to download">
+          <div class="qr-frame">
+            <img src="assets/download-qr.svg" alt="QR code linking to the PEAM-Registry APK download" width="232" height="232">
+          </div>
+          <p class="qr-title">Scan to download</p>
+          <p class="qr-sub">Open your Android camera and point it at the code.</p>
+          <div class="qr-chips">
+            <span class="chip chip-mint">Free</span>
+            <span class="chip chip-sky" id="apk-size">APK</span>
+            <span class="chip chip-lav">Android</span>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="stats">
+      <div class="container stats-grid">
+        <div><strong>GPS + biometric</strong><span>two checks on every attendance</span></div>
+        <div><strong>Works offline</strong><span>saved first, sent when online</span></div>
+        <div><strong>1 phone</strong><span>registered per employee</span></div>
+        <div><strong>94 tests</strong><span>run on every build</span></div>
+      </div>
+    </section>
+
+    <section id="features" class="section">
+      <div class="container">
+        <p class="eyebrow center">Features</p>
+        <h2 class="center">Everything you need to record attendance</h2>
+        <div class="features">
+          <article class="feature">
+            <div class="icon icon-lav"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.1-7-11.5A7 7 0 0 1 19 9.5C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></div>
+            <h3>Event area check</h3>
+            <p>Your GPS position is compared with the venue. Check-in opens only when you are inside the event area.</p>
+          </article>
+          <article class="feature">
+            <div class="icon icon-mint"><svg viewBox="0 0 24 24"><path d="M7 11a5 5 0 0 1 10 0v2a9 9 0 0 1-1.5 5M12 11v3a12 12 0 0 1-2 6.5M9.5 11a2.5 2.5 0 0 1 5 0M4.5 15a14 14 0 0 0 .5-4 7 7 0 0 1 12.5-4.3"/></svg></div>
+            <h3>Fingerprint or face</h3>
+            <p>Confirm it is you with the biometrics already on your phone. PEAM never stores your fingerprint or face.</p>
+          </article>
+          <article class="feature">
+            <div class="icon icon-sky"><svg viewBox="0 0 24 24"><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0"/><circle cx="12" cy="19" r="1"/><path d="M3 3l18 18"/></svg></div>
+            <h3>No signal? No problem</h3>
+            <p>Attendance is saved on your phone first and sent automatically once you are back online.</p>
+          </article>
+          <article class="feature">
+            <div class="icon icon-peach"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+            <h3>Hard to fake</h3>
+            <p>Blocks fake GPS apps, ignores a changed phone clock, and checks the app with Google Play Integrity.</p>
+          </article>
+          <article class="feature">
+            <div class="icon icon-lav"><svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></div>
+            <h3>Timely reminders</h3>
+            <p>Get notified about new events, 30 minutes before they start, and when you still need to check out.</p>
+          </article>
+          <article class="feature">
+            <div class="icon icon-mint"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></div>
+            <h3>Your attendance history</h3>
+            <p>See every check-in and check-out, and whether PHRMO already has it or it is still waiting to send.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="how" class="section section-tint">
+      <div class="container">
+        <p class="eyebrow center">How it works</p>
+        <h2 class="center">Five quick steps at the venue</h2>
+        <ol class="steps">
+          <li><span class="num">1</span><h3>Sign in</h3><p>Enter your Employee ID and the code sent to your work email.</p></li>
+          <li><span class="num">2</span><h3>Select event</h3><p>Pick the ongoing event from your list.</p></li>
+          <li><span class="num">3</span><h3>Check in</h3><p>The map shows you are inside the event area.</p></li>
+          <li><span class="num">4</span><h3>Confirm it's you</h3><p>Use your fingerprint or face.</p></li>
+          <li><span class="num">5</span><h3>Done</h3><p>You get a confirmation, and PHRMO receives your attendance.</p></li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="install" class="section">
+      <div class="container install-grid">
+        <div>
+          <p class="eyebrow">Install</p>
+          <h2>Get the app in a minute</h2>
+          <ol class="install-list">
+            <li>Scan the QR code or tap <strong>Download for Android</strong>.</li>
+            <li>Open the downloaded <code>peam-release.apk</code>.</li>
+            <li>If asked, allow your browser to <strong>install unknown apps</strong>.</li>
+            <li>Open PEAM and sign in with your Employee ID.</li>
+          </ol>
+          <p class="note">Requires Android 7.0 or newer with location and a screen lock (fingerprint or face) set up.
+            The first phone you sign in with becomes your registered phone. To switch phones, request it in the app and PHRMO will approve it.</p>
+        </div>
+        <div class="privacy">
+          <h3>Built with privacy in mind</h3>
+          <ul>
+            <li><span class="dot dot-mint"></span>Fingerprint and face checks happen inside your phone. Only "yes" or "no" reaches the app.</li>
+            <li><span class="dot dot-sky"></span>Location is read only while you check in or check out, never in the background.</li>
+            <li><span class="dot dot-lav"></span>You can see only your own records. Only PHRMO staff can review attendance.</li>
+            <li><span class="dot dot-peach"></span>Every attendance is checked again by the server, and doubtful records go to PHRMO, not to an automated decision.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta">
+      <div class="container cta-inner">
+        <img src="assets/app_icon.png" alt="PEAM-Registry app icon" width="88" height="88">
+        <div>
+          <h2>Ready for your next event?</h2>
+          <p>Download PEAM-Registry and check in the moment you arrive.</p>
+        </div>
+        <a class="btn btn-white" href="https://github.com/edwinrojo/peam/releases/latest/download/peam-release.apk">Download APK</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <p>© 2026 PEAM-Registry · Provincial Government of Davao del Sur · PHRMO</p>
+      <p><a href="https://github.com/edwinrojo/peam">Source on GitHub</a> · <a href="https://github.com/edwinrojo/peam/actions">Builds</a></p>
+    </div>
+  </footer>
+
+  <script src="main.js" defer></script>
+</body>
+</html>
