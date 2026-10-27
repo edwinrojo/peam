@@ -41,6 +41,7 @@ ios/Flutter/MapsSecrets.xcconfig
 /evaluation
 
 /overleaf
+/presentation
 
 # Symbolication related
 app.*.symbols
